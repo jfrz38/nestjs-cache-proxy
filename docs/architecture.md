@@ -2,122 +2,233 @@
 
 ## Overview
 
-`nestjs-cache-proxy` is a NestJS library that provides transparent, declarative caching for providers.
+`nestjs-cache-proxy` is a NestJS library for transparent, declarative caching of NestJS providers.
 
-The main goal is to add caching to repositories, services, or any other NestJS provider without modifying their implementation.
+The library allows caching to be introduced at the dependency-injection and module-composition level without modifying the implementation of the provider being cached.
 
-Caching must be configured exclusively at the NestJS dependency-injection / module level.
+A cached provider may be:
 
-Application and infrastructure classes must remain unaware that caching exists.
+* a repository
+* a use case
+* an application service
+* an API client
+* a gateway
+* an adapter
+* a query handler
+* another injectable NestJS provider
 
-The library should use NestJS dependency injection to wrap an existing provider with a transparent caching proxy.
+The provider implementation and its consumers must remain unaware that caching exists.
 
 Conceptually:
 
 ```text
-Application
-    │
-    ▼
-Repository interface / injection token
-    │
-    ▼
+Consumer
+   │
+   ▼
+Provider token
+   │
+   ▼
 Caching Proxy
-    │
-    ├── CacheManager / Keyv
-    │       │
-    │       ├── Memory
-    │       ├── Redis
-    │       └── Other KV backends
-    │
-    ▼
-Concrete Repository
-    │
-    ▼
-Database
+   │
+   ├── CacheManager / Keyv
+   │       ├── Memory
+   │       ├── Redis
+   │       └── Other KV stores
+   │
+   ▼
+Concrete provider
 ```
 
-The application continues injecting the same repository interface or token.
+For a repository:
 
-Example:
+```text
+Use Case
+   │
+   ▼
+UserRepository
+   │
+   ▼
+Caching Proxy
+   │
+   ├── Redis
+   │
+   ▼
+SqlUserRepository
+   │
+   ▼
+PostgreSQL
+```
+
+For a use case:
+
+```text
+Controller
+   │
+   ▼
+UserByCriteriaSearcher
+   │
+   ▼
+Caching Proxy
+   │
+   ▼
+DefaultUserByCriteriaSearcher
+   │
+   ▼
+UserRepository
+```
+
+The consumer continues injecting exactly the same token:
 
 ```ts
-constructor(
-  private readonly organizations: ListOrganizationsRepository,
-) {}
+export class UserByCriteriaSearcher {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+}
 ```
 
-The consumer must not know whether the repository is cached.
+The consumer must not know whether caching is enabled.
 
 ---
 
-# Goals
+# Core idea: automate the Decorator pattern
 
-The library should provide:
+Without this library, caching could be implemented manually using the Decorator pattern.
 
-* transparent caching through NestJS DI
-* no cache-specific code inside repositories or services
+For example:
+
+```ts
+export class RedisCacheUserRepository
+  implements UserRepository {
+
+  constructor(
+    private readonly repository: UserRepository,
+    private readonly client: RedisClient,
+  ) {}
+
+  async save(user: User): Promise<void> {
+    const result = await this.repository.save(user);
+
+    // optionally invalidate affected cache entries
+
+    return result;
+  }
+
+  async matching(
+    criteria: Criteria,
+  ): Promise<User> {
+    const cached =
+      await this.findInCache(criteria);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const user =
+      await this.repository.matching(criteria);
+
+    await this.saveInCache(
+      criteria,
+      user,
+    );
+
+    return user;
+  }
+}
+```
+
+This works, but introduces repetitive infrastructure code:
+
+* one cache decorator class per provider
+* duplicated cache lookup logic
+* duplicated cache write logic
+* duplicated invalidation logic
+* Redis/cache dependencies in application infrastructure
+* manual DI wiring
+
+`nestjs-cache-proxy` should automate this pattern.
+
+Instead of manually creating:
+
+```text
+RedisCacheUserRepository
+```
+
+the library creates an equivalent runtime proxy.
+
+Conceptually:
+
+```text
+UserRepository
+      │
+      ▼
+Generated runtime proxy
+      │
+      ├── cache policy
+      ├── cache manager
+      │
+      ▼
+SqlUserRepository
+```
+
+The library does not need to generate a physical TypeScript class.
+
+It can use:
+
+* NestJS factory providers
+* JavaScript `Proxy`
 * declarative cache policies
-* strongly typed configuration
-* cache-aside reads
-* invalidation
-* write-through
-* explicit cache resources
-* deterministic cache keys
-* resource versioning
-* cache contract testing
-* backend abstraction
-* memory and distributed cache support
-* resilient behavior when cache backends fail
-* observability
-* testability
-* refactor safety
 
-The library should focus on **provider caching**, not HTTP caching.
-
-HTTP features such as:
-
-* `Cache-Control`
-* ETags
-* CDN caching
-* conditional requests
-
-are explicitly outside the scope of this project.
+to obtain equivalent behavior.
 
 ---
 
 # Core principle
 
-Given an existing NestJS provider:
+Given:
 
 ```ts
 {
-  provide: ListOrganizationsRepository,
-  useClass: OrganizationsPostgreRepository,
+  provide: UserRepository,
+  useClass: SqlUserRepository,
 }
 ```
 
-the library should allow replacing it with something conceptually similar to:
+the developer should be able to replace it with:
 
 ```ts
 cachedProvider({
-  provide: ListOrganizationsRepository,
-  useClass: OrganizationsPostgreRepository,
-
-  resources: {
-    // ...
-  },
-
-  methods: {
-    // ...
-  },
+  provide: UserRepository,
+  useClass: SqlUserRepository,
+  policy: userCachePolicy,
 });
 ```
 
-Internally, NestJS should inject a Proxy instead of the raw repository.
+The application still injects:
 
-The proxy intercepts configured method calls and applies the corresponding cache policy before or after delegating to the real implementation.
+```ts
+UserRepository
+```
 
-The concrete repository must not contain:
+but NestJS actually resolves:
+
+```text
+UserRepository token
+        │
+        ▼
+Caching Proxy
+        │
+        ▼
+SqlUserRepository
+```
+
+The concrete provider remains unchanged.
+
+---
+
+# Provider implementations must remain cache-agnostic
+
+A provider being cached must not need:
 
 * cache decorators
 * Redis dependencies
@@ -126,38 +237,114 @@ The concrete repository must not contain:
 * TTL configuration
 * invalidation logic
 * serialization configuration
-* cache-specific branches
+* cache branches
+* cache-specific method parameters
 * cache-specific error handling
 
 Example:
 
 ```ts
 @Injectable()
-export class OrganizationsPostgreRepository
-  implements ListOrganizationsRepository {
+export class SqlUserRepository
+  implements UserRepository {
 
-  async findById(id: string): Promise<Organization | null> {
-    // PostgreSQL
+  async save(
+    user: User,
+  ): Promise<void> {
+    // SQL only
   }
 
-  async findAll(): Promise<Organization[]> {
-    // PostgreSQL
-  }
-
-  async update(
-    id: string,
-    organization: Organization,
-  ): Promise<Organization> {
-    // PostgreSQL
-  }
-
-  async delete(id: string): Promise<void> {
-    // PostgreSQL
+  async matching(
+    criteria: Criteria,
+  ): Promise<User> {
+    // SQL only
   }
 }
 ```
 
-This implementation should remain completely unchanged.
+No cache-specific code should be introduced.
+
+---
+
+# Provider consumers must remain cache-agnostic
+
+Consumers should also remain unchanged.
+
+Example:
+
+```ts
+@Injectable()
+export class UserByCriteriaSearcher {
+  constructor(
+    private readonly repository:
+      UserRepository,
+  ) {}
+
+  execute(criteria: Criteria) {
+    return this.repository.matching(
+      criteria,
+    );
+  }
+}
+```
+
+Enabling or disabling caching must not require changes here.
+
+---
+
+# Providers, not repositories
+
+The public API should use provider terminology.
+
+Prefer:
+
+```ts
+cachedProvider(...)
+```
+
+over:
+
+```ts
+cachedRepository(...)
+```
+
+Prefer:
+
+```ts
+defineCachePolicy<UserService>(...)
+```
+
+over repository-specific abstractions.
+
+The library operates on NestJS providers.
+
+Repository caching is simply one important use case.
+
+---
+
+# Goals
+
+The library should provide:
+
+* transparent caching through NestJS DI
+* declarative cache configuration
+* zero cache code inside wrapped providers
+* strongly typed policies
+* cache-aside
+* invalidation
+* write-through
+* explicit resources
+* deterministic cache keys
+* cache resource versioning
+* cache contracts
+* testing utilities
+* memory cache support
+* Redis support through existing cache abstractions
+* remote KV compatibility
+* observability
+* resilience
+* refactor safety
+* centralized cache configuration
 
 ---
 
@@ -165,885 +352,52 @@ This implementation should remain completely unchanged.
 
 ```text
 nestjs-cache-proxy
-├── provider wrapping
-├── DI integration
-├── cache policies
+├── NestJS provider wrapping
+├── dependency injection integration
+├── cache policy definitions
+├── resource definitions
 ├── cache-aside
 ├── invalidation
 ├── write-through
-├── key contracts
-├── resource versioning
-├── serialization hooks
+├── key generation
+├── cache contracts
+├── versioning
 ├── testing utilities
 ├── observability
-├── consistency rules
-└── resilience behavior
+├── resilience
+└── consistency rules
 
 cache-manager / Keyv
-├── storage abstraction
-├── in-memory storage
+├── cache storage abstraction
+├── local memory
 ├── Redis adapters
 ├── remote KV adapters
-└── backend-specific storage behavior
+└── backend-specific behavior
 ```
 
-The project must avoid becoming another cache storage framework.
+The library must not become another Redis or KV client.
 
-Its value is the transparent integration of caching into the NestJS dependency-injection layer.
+Its value is the transparent caching layer around NestJS providers.
 
 ---
 
-# Initial API proposal
+# Cache backend architecture
 
-Example configuration:
+The library must be backend-agnostic.
 
-```ts
-cachedProvider({
-  provide: OrganizationRepository,
-  useClass: OrganizationsPostgreRepository,
-
-  resources: {
-    organization: {
-      version: 1,
-      ttl: '5m',
-      key: ([id]) => `${id}`,
-    },
-
-    organizations: {
-      version: 1,
-      ttl: '1m',
-      key: () => 'all',
-    },
-  },
-
-  methods: {
-    findById: {
-      cache: 'organization',
-    },
-
-    findAll: {
-      cache: 'organizations',
-    },
-
-    update: {
-      writeThrough: 'organization',
-      invalidate: ['organizations'],
-    },
-
-    create: {
-      invalidate: ['organizations'],
-    },
-
-    delete: {
-      invalidate: ['organization', 'organizations'],
-    },
-  },
-});
-```
-
-The exact public API may evolve.
-
-Prefer a strongly typed and ergonomic API over preserving this exact syntax.
-
----
-
-# Cache resources
-
-A cache resource represents a cached representation of some data.
-
-Example:
-
-```ts
-resources: {
-  organization: {
-    version: 1,
-    ttl: '5m',
-    key: ([id]) => `${id}`,
-  },
-}
-```
-
-A resource should define, at minimum:
-
-* key generation
-* TTL
-* version
-
-Potential future options:
-
-* namespace
-* serialization
-* deserialization
-* negative caching
-* TTL jitter
-* cache tier
-* stale TTL
-* coalescing
-* tags
-
-Resources should be reusable by multiple repository methods.
-
-This avoids duplicating cache semantics between reads, updates and deletes.
-
----
-
-# Cache-aside reads
-
-A method configured with:
-
-```ts
-findById: {
-  cache: 'organization',
-}
-```
-
-should behave as:
-
-```text
-findById(id)
-    │
-    ▼
-cache.get(key)
-    │
-    ├── HIT ─────────────► return cached value
-    │
-    └── MISS
-          │
-          ▼
-    repository.findById(id)
-          │
-          ▼
-    cache.set(key, result)
-          │
-          ▼
-        return
-```
-
-The repository method should only execute on a cache miss.
-
-This is the default read strategy.
-
----
-
-# Write-through
-
-If a mutation returns the new canonical value:
-
-```ts
-update: {
-  writeThrough: 'organization',
-}
-```
-
-the library should:
-
-```text
-repository.update(id, data)
-        │
-        ▼
-   updated entity
-        │
-        ▼
-cache.set(organization:id, entity)
-        │
-        ▼
-      return
-```
-
-Do not execute an additional `findById()` when the mutation already returns the final entity.
-
-The API may need explicit mappings:
-
-```ts
-update: {
-  writeThrough: {
-    resource: 'organization',
-
-    keyArgs: ({ args }) => [args[0]],
-
-    value: ({ result }) => result,
-  },
-}
-```
-
-The configuration must be strongly typed against the actual repository method.
-
----
-
-# Invalidation
-
-Mutating operations should be able to invalidate one or more resources.
-
-Example:
-
-```ts
-delete: {
-  invalidate: [
-    'organization',
-    'organizations',
-  ],
-}
-```
-
-Conceptually:
-
-```text
-repository.delete(id)
-       │
-       ▼
-delete organization:id
-       │
-       ▼
-delete organizations
-```
-
-The database operation must happen first.
-
-Cache invalidation must only occur after a successful repository operation.
-
-If the repository throws, the cache must not be invalidated.
-
----
-
-# Cache refresh
-
-The library may support explicit refresh operations:
-
-```ts
-update: {
-  refresh: {
-    method: 'findById',
-    args: ({ args }) => [args[0]],
-  },
-}
-```
-
-This would execute a reader after a successful mutation and repopulate the corresponding cache entry.
-
-Refresh should not be the default strategy.
-
-Preferred order:
-
-1. write-through when mutation result contains the canonical entity
-2. invalidation when it does not
-3. explicit refresh only when necessary
-
----
-
-# Collections and derived queries
-
-The library must distinguish individual entities from cached query results.
-
-Examples:
-
-```text
-organization:v1:42
-organizations:v1:all
-organizations:v1:page:1
-organizations:v1:active
-organizations:v1:tenant:7
-```
-
-Updating organization `42` may invalidate:
-
-```text
-organization:v1:42
-organizations:v1:all
-organizations:v1:active
-organizations:v1:tenant:7
-```
-
-This is substantially more complex than caching individual entities.
-
-The first version does not need automatic dependency graphs, but the architecture must not prevent adding them later.
-
----
-
-# Cache tags
-
-A future feature may allow tagging cached values.
-
-Example:
-
-```ts
-resources: {
-  organizationById: {
-    tags: ({ result }) => [
-      'organizations',
-      `organization:${result.id}`,
-    ],
-  },
-}
-```
-
-Mutations could invalidate tags:
-
-```ts
-update: {
-  invalidateTags: ({ args }) => [
-    'organizations',
-    `organization:${args[0]}`,
-  ],
-}
-```
-
-Tags may eventually be preferable to manually enumerating every derived cache resource.
-
-This is not required for the MVP.
-
----
-
-# Cache key contracts
-
-Cache keys must be treated as persistent contracts.
-
-A cache key is not merely an implementation detail.
-
-Cached values may survive:
-
-* application restarts
-* deployments
-* rolling deployments
-* multiple versions running simultaneously
-* repository refactors
-* method signature changes
-* changes to query semantics
-* serialization changes
-
-Therefore cache keys must be:
-
-* deterministic
-* strongly typed
-* versioned
-* testable
-
-Example:
-
-```ts
-findById(id: string)
-```
-
-with:
-
-```ts
-key: ([id]) => `${id}`
-```
-
-may later become:
-
-```ts
-findById(
-  tenantId: string,
-  id: string,
-)
-```
-
-If configuration is poorly typed, a stale key function could silently use the wrong parameter.
-
-The library should make this difficult.
-
----
-
-# Strong typing against repository methods
-
-Method names and arguments should be inferred directly from the provider type.
-
-Conceptually:
-
-```ts
-type MethodArgs<T, K extends keyof T> =
-  T[K] extends (...args: infer A) => unknown
-    ? A
-    : never;
-```
-
-For:
-
-```ts
-interface OrganizationRepository {
-  findById(id: string): Promise<Organization | null>;
-}
-```
-
-the key function should receive:
-
-```ts
-(args: [string]) => string
-```
-
-If the method becomes:
-
-```ts
-findById(
-  tenantId: string,
-  id: string,
-): Promise<Organization | null>;
-```
-
-the cache configuration should now receive:
-
-```ts
-(args: [string, string]) => string
-```
-
-Method names in configuration should also be constrained to actual callable properties.
-
-This should fail:
-
-```ts
-methods: {
-  findByID: {
-    cache: 'organization',
-  },
-}
-```
-
-if the actual method is:
-
-```ts
-findById()
-```
-
----
-
-# Parameter refactor safety
-
-Positional parameters are more fragile than object arguments.
-
-This:
-
-```ts
-findById(
-  tenantId: string,
-  id: string,
-)
-```
-
-requires:
-
-```ts
-key: ([tenantId, id]) =>
-  `${tenantId}:${id}`
-```
-
-A refactor that swaps two parameters of the same type may remain valid TypeScript.
-
-For cache-sensitive queries, object arguments are safer:
-
-```ts
-findById(query: {
-  tenantId: string;
-  id: string;
-})
-```
-
-Then:
-
-```ts
-key: ([query]) =>
-  `${query.tenantId}:${query.id}`
-```
-
-Renaming or removing properties will produce stronger compile-time feedback.
-
-The library should not require object parameters, but documentation should recommend them for complex cache keys.
-
----
-
-# Resource versioning
-
-Resources should support explicit versions:
-
-```ts
-resources: {
-  organization: {
-    version: 2,
-    ttl: '5m',
-    key: ([id]) => `${id}`,
-  },
-}
-```
-
-The final key should include the version automatically:
-
-```text
-organization:v2:123
-```
-
-Users should not manually encode versions in every key function.
-
-A resource version should be bumped when there is an incompatible change in:
-
-* cache key semantics
-* argument interpretation
-* serialized value shape
-* repository return structure
-* tenancy rules
-* query meaning
-* authorization-sensitive representation
-
-Example:
-
-```text
-organization:v1:123
-```
-
-may contain:
-
-```json
-{
-  "id": "123",
-  "name": "Example"
-}
-```
-
-while:
-
-```text
-organization:v2:123
-```
-
-may contain:
-
-```json
-{
-  "id": "123",
-  "name": "Example",
-  "status": "ACTIVE"
-}
-```
-
-Old values can naturally expire through TTL.
-
-No explicit migration should usually be required.
-
----
-
-# Namespaces
-
-The library should generate namespaced final keys.
-
-Potential format:
-
-```text
-<application>:<environment>:<resource>:v<version>:<key>
-```
-
-Example:
-
-```text
-my-api:production:organization:v2:123
-```
-
-This prevents collisions when:
-
-* multiple applications share Redis
-* multiple environments share infrastructure
-* different modules use similar resource names
-
-The exact prefix strategy should be configurable.
-
-Example:
-
-```ts
-CacheProxyModule.forRoot({
-  namespace: {
-    application: 'my-api',
-    environment: 'production',
-  },
-});
-```
-
-Repository cache policies should not need to repeat this information.
-
----
-
-# Cache key collisions
-
-Different inputs must not accidentally produce identical keys.
-
-Bad:
-
-```ts
-key: ([tenantId, organizationId]) =>
-  `${tenantId}${organizationId}`
-```
-
-This can produce:
-
-```text
-tenant=12, organization=3  -> 123
-tenant=1, organization=23  -> 123
-```
-
-Prefer:
-
-```ts
-`${tenantId}:${organizationId}`
-```
-
-or another unambiguous representation.
-
-Testing helpers should support collision tests for known input fixtures.
-
----
-
-# Sensitive data in keys
-
-Cache keys must not leak sensitive data.
-
-Avoid directly including:
-
-* passwords
-* access tokens
-* JWTs
-* API keys
-* secrets
-* session IDs
-* sensitive personal values
-
-The library may eventually provide deterministic hashing helpers.
-
-Example:
-
-```ts
-keyHash([userId, token])
-```
-
-However, key hashing should not be used as an excuse to make unstable key generation automatic.
-
----
-
-# Multi-tenancy
-
-Multi-tenant applications require special care.
-
-This is unsafe:
-
-```ts
-key: ([id]) => `${id}`
-```
-
-if organizations are tenant-scoped.
-
-Prefer:
-
-```ts
-key: ([tenantId, id]) =>
-  `${tenantId}:${id}`
-```
-
-or:
-
-```ts
-key: ([query]) =>
-  `${query.tenantId}:${query.id}`
-```
-
-Cross-tenant cache collisions may cause data leaks.
-
-The documentation must explicitly call out tenant identity as part of the cache contract whenever cached data is tenant-specific.
-
----
-
-# Serialization
-
-Distributed caches typically do not preserve JavaScript object identity or prototypes.
-
-Potential problematic values include:
-
-* `Date`
-* `BigInt`
-* `Map`
-* `Set`
-* custom classes
-* domain value objects
-* Buffers
-* cyclic structures
-
-The library should not assume that every result can safely pass through `JSON.stringify()` / `JSON.parse()`.
-
-Resources should eventually support:
-
-```ts
-organization: {
-  serialize: (value) => ...,
-  deserialize: (value) => ...,
-}
-```
-
-The MVP may rely on the configured backend behavior but must document serialization expectations clearly.
-
-Changing serialization format should normally require a resource version bump.
-
----
-
-# Null and negative caching
-
-The library must distinguish:
-
-```text
-cache MISS
-```
-
-from:
-
-```text
-cached null
-```
-
-Example:
-
-```ts
-findById('missing-id')
-```
-
-returns:
-
-```ts
-null
-```
-
-Repeated requests should optionally avoid repeatedly querying the database.
-
-Resources may support:
-
-```ts
-organization: {
-  cacheNull: true,
-  negativeTtl: '30s',
-}
-```
-
-This creates negative caching.
-
-The cache abstraction must therefore use a reliable representation for cache misses.
-
-Do not treat every `undefined` / `null` result as a cache miss without an explicit policy.
-
----
-
-# TTL
-
-Resources should define TTL explicitly.
-
-Example:
-
-```ts
-organization: {
-  ttl: '5m',
-}
-```
-
-The library should normalize supported formats internally.
-
-Potential inputs:
-
-```ts
-ttl: 300_000
-```
-
-or:
-
-```ts
-ttl: '5m'
-```
-
-The exact public API should remain simple and predictable.
-
----
-
-# TTL jitter
-
-A future feature should support TTL jitter.
-
-Without jitter, thousands of entries created at approximately the same time may expire simultaneously.
-
-Example:
-
-```ts
-organization: {
-  ttl: '5m',
-  jitter: 0.1,
-}
-```
-
-Meaning approximately:
-
-```text
-5 minutes ± 10%
-```
-
-This helps prevent synchronized cache expiry and database spikes.
-
-Not required for MVP.
-
----
-
-# Cache stampede protection
-
-Multiple simultaneous misses for the same key can overwhelm the database.
-
-Without protection:
-
-```text
-100 simultaneous requests
-        │
-        ▼
-   same cache miss
-        │
-        ▼
-100 database queries
-```
-
-With request coalescing / single-flight:
-
-```text
-100 requests
-      │
-      ▼
- single cache miss
-      │
-      ▼
- one database query
-      │
-      ▼
- shared Promise
-```
-
-Potential configuration:
-
-```ts
-organization: {
-  coalesce: true,
-}
-```
-
-This should be considered an important post-MVP feature.
-
-The implementation should operate per final cache key.
-
----
-
-# Store abstraction
-
-`nestjs-cache-proxy` must be cache-backend agnostic.
-
-The library must not implement Redis, memory caches, or remote KV storage directly.
-
-It should integrate with:
+It should build on the NestJS caching ecosystem:
 
 * `@nestjs/cache-manager`
 * `cache-manager`
-* Keyv-compatible stores/adapters
+* Keyv-compatible stores
 
 Conceptually:
 
 ```text
-Provider Proxy
+Caching Proxy
      │
      ▼
-nestjs-cache-proxy
+CACHE_MANAGER
      │
      ▼
 cache-manager / Keyv
@@ -1051,859 +405,917 @@ cache-manager / Keyv
      ├── Memory
      ├── Redis
      ├── Remote KV
-     └── Other compatible stores
+     └── Other adapters
 ```
 
-Repository configuration must remain identical regardless of backend.
+Cache policies should describe caching semantics, not backend technology.
+
+Good:
+
+```ts
+organization: {
+  version: 1,
+  ttl: '5m',
+  key: ([id]) => id,
+}
+```
+
+Avoid:
+
+```ts
+organization: {
+  redisDb: 2,
+  redisPrefix: 'org',
+}
+```
 
 ---
 
-# Backend configuration
+# Global module configuration
 
-Backend configuration should remain separate from provider policy.
+Global cache infrastructure should be configured once.
 
-Preferred architecture:
+The desired API should resemble established NestJS module patterns such as:
+
+```text
+TypeOrmModule.forRoot()
+TypeOrmModule.forFeature()
+
+MongooseModule.forRoot()
+MongooseModule.forFeature()
+```
+
+`nestjs-cache-proxy` should therefore consider exposing:
+
+```ts
+CacheProxyModule.forRoot(...)
+```
+
+and:
+
+```ts
+CacheProxyModule.forFeature(...)
+```
+
+---
+
+# `CacheProxyModule.forRoot`
+
+`forRoot` should configure library-wide behavior.
+
+Example:
 
 ```ts
 @Module({
   imports: [
     CacheModule.register({
-      // memory / Redis / Keyv configuration
+      // memory / Redis / Keyv
     }),
 
-    CacheProxyModule.forRoot(),
+    CacheProxyModule.forRoot({
+      namespace: {
+        application: 'users-api',
+        environment:
+          process.env.NODE_ENV,
+      },
+    }),
   ],
 })
 export class AppModule {}
 ```
 
-`nestjs-cache-proxy` should consume the injected `CACHE_MANAGER`.
+Possible global options:
 
-Avoid creating a competing cache storage abstraction unless necessary.
+* namespace
+* error behavior
+* logging/debugging
+* observability hooks
+* defaults
+* cache operation timeout
+* future coalescing defaults
+* future serialization defaults
 
----
+The actual storage backend should normally remain configured through NestJS `CacheModule`.
 
-# Local in-memory cache
-
-The library must work with local in-memory caches.
-
-Topology:
-
-```text
-Application process
-      │
-      ▼
-Memory cache
-      │
-      ▼
-Repository
-      │
-      ▼
-Database
-```
-
-Useful for:
-
-* development
-* tests
-* single-instance services
-* hot short-lived data
-
-The documentation must state clearly that local memory is process-local.
+`CacheProxyModule` should consume `CACHE_MANAGER`.
 
 ---
 
-# Distributed cache
+# `CacheProxyModule.forFeature`
 
-The library must support shared distributed caches such as Redis through the configured cache ecosystem.
-
-Topology:
-
-```text
-App instance A ─┐
-                │
-App instance B ─┼──► Redis ───► Database
-                │
-App instance C ─┘
-```
-
-This allows application instances to share cached values and invalidations at the distributed-store level.
-
----
-
-# Remote KV stores
-
-The architecture should allow remote key-value stores through compatible adapters.
-
-Possible categories include:
-
-* Redis-compatible services
-* Keyv-supported stores
-* custom Keyv adapters
-* cloud KV systems
-
-`nestjs-cache-proxy` should not depend directly on vendor-specific APIs.
-
----
-
-# Multi-level caching
-
-The architecture should allow L1/L2 cache topologies.
+`forFeature` should register cached providers.
 
 Example:
-
-```text
-Repository Proxy
-      │
-      ▼
-L1 local memory
-      │ miss
-      ▼
-L2 Redis / remote KV
-      │ miss
-      ▼
-Database
-```
-
-Behavior:
-
-```text
-GET
- │
- ▼
-L1
- ├── HIT -> return
- │
- └── MISS
-      │
-      ▼
-     L2
-      ├── HIT -> populate L1 -> return
-      │
-      └── MISS
-           │
-           ▼
-       repository
-           │
-           ▼
-       populate L2
-           │
-           ▼
-       populate L1
-           │
-           ▼
-         return
-```
-
-If `cache-manager` already supports multiple stores, prefer leveraging that capability rather than implementing the hierarchy from scratch.
-
----
-
-# Multi-level cache consistency
-
-L1/L2 caching introduces consistency problems.
-
-Example:
-
-```text
-App A L1
-App B L1
-App C L1
-   │
-   └── shared Redis L2
-```
-
-Deleting a value from Redis does not necessarily remove it from every process-local L1 cache.
-
-Therefore the library must not claim strong consistency unless an invalidation propagation mechanism exists.
-
-Potential future strategies:
-
-* short L1 TTL
-* Redis Pub/Sub
-* event bus
-* invalidation messages
-* resource generations
-* versioned entries
-
-For the MVP, consistency limitations must be documented clearly.
-
----
-
-# Store selection per resource
-
-The initial version should use the globally configured cache manager.
-
-Do not require users to select a backend for each resource.
-
-Potential future API:
 
 ```ts
-resources: {
-  organization: {
-    tier: 'distributed',
+CacheProxyModule.forFeature([
+  {
+    provide: UserRepository,
+    useClass: SqlUserRepository,
+    policy: userCachePolicy,
   },
 
-  countryList: {
-    tier: 'local',
+  {
+    provide: OrganizationRepository,
+    useClass:
+      SqlOrganizationRepository,
+    policy:
+      organizationCachePolicy,
   },
+])
+```
+
+The dynamic module should:
+
+1. register or resolve the concrete implementation
+2. create the caching proxy
+3. inject the cache manager
+4. expose the original public provider token
+
+Conceptually:
+
+```text
+SqlUserRepository
+       │
+       ▼
+Proxy factory
+       │
+       ├── CACHE_MANAGER
+       ├── policy
+       │
+       ▼
+UserRepository token
+```
+
+---
+
+# Centralized application cache module
+
+Applications should be able to centralize all caching configuration in a dedicated module.
+
+Example structure:
+
+```text
+src/
+├── users/
+│   ├── user.repository.ts
+│   ├── sql-user.repository.ts
+│   ├── user-by-criteria-searcher.ts
+│   └── users.module.ts
+│
+├── organizations/
+│   └── ...
+│
+└── cache/
+    ├── application-cache.module.ts
+    ├── user.cache-policy.ts
+    └── organization.cache-policy.ts
+```
+
+Example:
+
+```ts
+@Module({
+  imports: [
+    CacheProxyModule.forFeature([
+      {
+        provide: UserRepository,
+        useClass: SqlUserRepository,
+        policy: userCachePolicy,
+      },
+
+      {
+        provide:
+          OrganizationRepository,
+        useClass:
+          SqlOrganizationRepository,
+        policy:
+          organizationCachePolicy,
+      },
+    ]),
+  ],
+
+  exports: [
+    CacheProxyModule,
+  ],
+})
+export class ApplicationCacheModule {}
+```
+
+Functional modules may then simply import:
+
+```ts
+@Module({
+  imports: [
+    ApplicationCacheModule,
+  ],
+
+  providers: [
+    UserByCriteriaSearcher,
+  ],
+})
+export class UsersModule {}
+```
+
+The use case remains:
+
+```ts
+@Injectable()
+export class UserByCriteriaSearcher {
+  constructor(
+    private readonly repository:
+      UserRepository,
+  ) {}
 }
+```
+
+No cache configuration is required in the use case.
+
+---
+
+# Concrete provider ownership
+
+The proxy needs access to the real concrete implementation.
+
+There are two valid architectural models.
+
+## Model A — cache module registers the implementation
+
+Example:
+
+```ts
+CacheProxyModule.forFeature([
+  {
+    provide: UserRepository,
+    useClass: SqlUserRepository,
+    policy: userCachePolicy,
+  },
+])
+```
+
+Internally the dynamic module registers:
+
+```text
+SqlUserRepository
+```
+
+as well as:
+
+```text
+UserRepository -> caching proxy
+```
+
+This is the simplest developer experience.
+
+---
+
+# Model B — cache module wraps an existing provider
+
+Infrastructure modules may own the concrete provider.
+
+Example:
+
+```ts
+@Module({
+  providers: [
+    SqlUserRepository,
+  ],
+
+  exports: [
+    SqlUserRepository,
+  ],
+})
+export class UserInfrastructureModule {}
+```
+
+Then:
+
+```ts
+@Module({
+  imports: [
+    UserInfrastructureModule,
+
+    CacheProxyModule.forFeature([
+      {
+        provide: UserRepository,
+        useExisting:
+          SqlUserRepository,
+        policy: userCachePolicy,
+      },
+    ]),
+  ],
+})
+export class UserCacheModule {}
+```
+
+Conceptually:
+
+```text
+UserInfrastructureModule
+        │
+        ▼
+SqlUserRepository
+        │
+        ▼
+UserCacheModule
+        │
+        ▼
+Caching Proxy
+        │
+        ▼
+UserRepository
+```
+
+The library should ideally support both `useClass` and `useExisting`.
+
+---
+
+# Recommended application architecture
+
+A clean architecture may use:
+
+```text
+Infrastructure Module
+        │
+        │ exports concrete providers
+        ▼
+Application Cache Module
+        │
+        │ wraps providers
+        ▼
+Functional Modules
+        │
+        ▼
+Use Cases / Controllers
+```
+
+Example:
+
+```text
+UserInfrastructureModule
+       │
+       ▼
+ApplicationCacheModule
+       │
+       ▼
+UsersModule
+```
+
+This allows cache configuration to remain centralized without moving database implementation concerns into functional modules.
+
+---
+
+# Separate cache policy files
+
+Large policies should not have to live directly inside NestJS modules.
+
+Recommended:
+
+```text
+cache/
+├── application-cache.module.ts
+├── user.cache-policy.ts
+└── organization.cache-policy.ts
+```
+
+Example:
+
+```ts
+export const userCachePolicy =
+  defineCachePolicy<UserRepository>({
+    resources: {
+      // ...
+    },
+
+    methods: {
+      // ...
+    },
+  });
+```
+
+Then:
+
+```ts
+CacheProxyModule.forFeature([
+  {
+    provide: UserRepository,
+    useClass: SqlUserRepository,
+    policy: userCachePolicy,
+  },
+])
+```
+
+This keeps module files small.
+
+---
+
+# TypeScript-first policy configuration
+
+The primary configuration mechanism should be strongly typed TypeScript.
+
+Example:
+
+```ts
+export const userCachePolicy =
+  defineCachePolicy<UserRepository>({
+    resources: {
+      userByCriteria: {
+        version: 1,
+        ttl: '5m',
+
+        key: ([criteria]) => ({
+          tenantId:
+            criteria.tenantId,
+
+          email:
+            criteria.email,
+        }),
+      },
+    },
+
+    methods: {
+      matching: {
+        cache: 'userByCriteria',
+      },
+    },
+  });
+```
+
+This should be the recommended approach.
+
+Benefits:
+
+* TypeScript type safety
+* refactor safety
+* IDE autocomplete
+* direct access to method arguments
+* value-object support
+* composability
+* compile-time detection of many configuration errors
+
+---
+
+# Avoid template engines as the primary API
+
+The primary API should not rely on:
+
+```text
+user:{{criteria.email}}
+```
+
+or generic template engines such as Mustache.
+
+Template strings lose:
+
+* type safety
+* autocomplete
+* rename support
+* compile-time property checks
+* complex value support
+
+A refactor from:
+
+```ts
+criteria.email
+```
+
+to:
+
+```ts
+criteria.contact.email
+```
+
+could silently break a string template.
+
+With TypeScript:
+
+```ts
+key: ([criteria]) =>
+  criteria.contact.email
+```
+
+the compiler can help detect the change.
+
+---
+
+# Optional key template helpers
+
+The library may later expose limited key helpers for simple cases.
+
+For example:
+
+```ts
+key: keyBy(
+  ([criteria]) =>
+    criteria.email,
+
+  ([criteria]) =>
+    criteria.status,
+)
 ```
 
 or:
 
 ```ts
-CacheProxyModule.forRoot({
-  stores: {
-    local: ...,
-    distributed: ...,
-  },
-});
+key: keyByArg(0)
 ```
 
-This is not required initially, but the architecture should not prevent it.
+These helpers should preserve type safety.
+
+Avoid introducing a generic template engine unless there is a compelling use case.
 
 ---
 
-# Dependency injection
+# Structured cache key input
 
-The feature should integrate using standard NestJS custom-provider mechanisms.
+The `key` function should not necessarily need to return a string.
 
-Internally:
+Prefer supporting structured values:
 
 ```ts
-{
-  provide: RepositoryToken,
-
-  inject: [
-    ConcreteRepository,
-    CACHE_MANAGER,
-  ],
-
-  useFactory: (
-    repository,
-    cache,
-  ) => createCachingProxy(
-    repository,
-    cache,
-    policy,
-  ),
-}
+key: ([id]) => id
 ```
 
-The concrete provider must also be registered separately so the proxy factory can inject it.
+```ts
+key: ([tenantId, id]) => [
+  tenantId,
+  id,
+]
+```
 
-Avoid modifying NestJS internals.
+```ts
+key: ([criteria]) => ({
+  tenantId:
+    criteria.tenantId,
 
----
+  email:
+    criteria.email,
+})
+```
 
-# Proxy implementation
-
-Use JavaScript `Proxy` to intercept configured method calls.
+The library can then normalize the result deterministically.
 
 Conceptually:
 
-```ts
-new Proxy(repository, {
-  get(target, property, receiver) {
-    const value = Reflect.get(
-      target,
-      property,
-      receiver,
-    );
-
-    if (typeof value !== 'function') {
-      return value;
-    }
-
-    return (...args: unknown[]) =>
-      executePolicy({
-        target,
-        method: property,
-        args,
-        value,
-      });
-  },
-});
+```text
+resource
++
+version
++
+canonical serialized key input
+=
+final cache key
 ```
 
-Requirements:
-
-* preserve `this`
-* preserve arguments
-* preserve return values
-* preserve async behavior
-* transparently forward unconfigured methods
-* preserve repository errors
-* preserve property access
-* avoid modifying behavior when caching is disabled
+This reduces manual string composition and accidental collisions.
 
 ---
 
-# Default behavior
+# Advanced policy classes
 
-Caching must be explicit.
+Most applications should use object policies.
 
-Do not automatically cache every public method.
+However, advanced users may require classes.
+
+Example:
+
+```ts
+@Injectable()
+export class UserCachePolicy
+  implements CachePolicy<UserRepository> {
+
+  // policy definition
+}
+```
+
+This may be useful when policy construction needs:
+
+* injected configuration
+* shared services
+* complex key construction
+* dynamic runtime values
+
+Class-based policies should be an advanced escape hatch, not the primary API.
+
+---
+
+# Cache resources
+
+A cache resource represents one cached representation.
+
+Example:
+
+```ts
+resources: {
+  userById: {
+    version: 1,
+    ttl: '5m',
+    key: ([id]) => id,
+  },
+
+  userByCriteria: {
+    version: 1,
+    ttl: '1m',
+
+    key: ([criteria]) => ({
+      tenantId:
+        criteria.tenantId,
+
+      email:
+        criteria.email,
+    }),
+  },
+}
+```
+
+Resources should define:
+
+* key derivation
+* TTL
+* version
+
+Potential additional options:
+
+* negative caching
+* serialization
+* TTL jitter
+* stale TTL
+* coalescing
+* tags
+* cache tier
+
+---
+
+# Cache-aside
+
+For:
+
+```ts
+methods: {
+  matching: {
+    cache: 'userByCriteria',
+  },
+}
+```
+
+the proxy should perform:
+
+```text
+matching(criteria)
+       │
+       ▼
+build cache key
+       │
+       ▼
+cache.get()
+       │
+       ├── HIT
+       │    │
+       │    ▼
+       │  return
+       │
+       └── MISS
+            │
+            ▼
+     provider.matching()
+            │
+            ▼
+       cache.set()
+            │
+            ▼
+          return
+```
+
+This behavior corresponds to the manual decorator:
+
+```ts
+async matching(criteria: Criteria) {
+  const cached =
+    await cache.get(key);
+
+  if (cached !== MISS) {
+    return cached;
+  }
+
+  const result =
+    await provider.matching(
+      criteria,
+    );
+
+  await cache.set(
+    key,
+    result,
+  );
+
+  return result;
+}
+```
+
+The library generates this behavior automatically.
+
+---
+
+# Passthrough methods
+
+Methods without configured cache behavior must simply call the underlying provider.
 
 Example:
 
 ```ts
 methods: {
-  findById: {
-    cache: 'organization',
+  matching: {
+    cache: 'userByCriteria',
   },
 }
 ```
 
-means:
+If `save` is not configured:
 
-```text
-findById() -> cached
-save()     -> passthrough
-update()   -> passthrough
-delete()   -> passthrough
+```ts
+save(user)
 ```
 
-Do not infer behavior from method names such as:
+becomes:
 
-```text
-get*
-find*
-save*
-update*
-delete*
+```ts
+return concreteProvider.save(user);
 ```
 
-Explicit configuration is safer.
+No other behavior should be added.
 
 ---
 
-# Error handling
+# Invalidation
 
-The underlying database remains the source of truth.
-
-Default behavior should favor availability.
-
-Example:
-
-```text
-cache GET fails
-      │
-      ▼
-execute repository
-```
-
-```text
-repository succeeds
-      │
-      ▼
-cache SET fails
-      │
-      ▼
-return repository result
-```
-
-Repository failures must never be swallowed.
-
-The library should eventually allow configuring fail-open vs fail-closed behavior.
-
-Default recommendation:
-
-```text
-cache failures -> fail open
-repository failures -> propagate
-```
-
----
-
-# Cache timeouts
-
-A slow cache can be worse than a failed cache.
-
-Example:
-
-```text
-Redis GET = 2 seconds
-Database query = 20 ms
-```
-
-The cache layer should eventually support configurable operation timeouts.
+A mutation may invalidate cached resources.
 
 Example:
 
 ```ts
-CacheProxyModule.forRoot({
-  timeout: {
-    get: '50ms',
-    set: '100ms',
+methods: {
+  save: {
+    invalidate: [
+      'userByCriteria',
+      'users',
+    ],
   },
-});
+}
 ```
 
-If cache access exceeds the configured threshold, the library may fail open and execute the repository.
-
-Not required for MVP, but the design should account for it.
-
----
-
-# Circuit breaker
-
-A future version may support circuit-breaker behavior around cache backends.
-
-If Redis repeatedly fails, repeatedly attempting every cache operation may increase latency.
-
-Potential behavior:
+Execution:
 
 ```text
-Redis healthy
+save(user)
    │
    ▼
-normal caching
-
-many Redis failures
+SqlUserRepository.save(user)
    │
    ▼
-circuit open
+success
    │
    ▼
-temporarily bypass cache
-```
-
-Not required for MVP.
-
----
-
-# Order of effects
-
-Mutation ordering must be deterministic.
-
-Preferred order:
-
-```text
-repository mutation
-        │
-        ▼
-successful DB result
-        │
-        ▼
-cache update / invalidation
-        │
-        ▼
+invalidate configured resources
+   │
+   ▼
 return
 ```
 
-Do not mutate cache before the source-of-truth operation succeeds.
+If the repository operation fails, invalidation must not happen.
 
 ---
 
-# Transactions
+# Write-through
 
-Caching introduces complexity around database transactions.
+If a mutation returns the canonical updated entity, the library should support using the result to update the cache.
 
-This is unsafe:
+Example:
 
-```text
-UPDATE DB inside transaction
-        │
-        ▼
-cache invalidated
-        │
-        ▼
-transaction rolls back
+```ts
+update: {
+  writeThrough: {
+    resource: 'userById',
+
+    keyArgs: ({ args }) => [
+      args[0],
+    ],
+
+    value: ({ result }) =>
+      result,
+  },
+}
 ```
 
-The database still contains the old value, but cache state was modified based on an uncommitted mutation.
-
-The library must document that caching at provider-call level cannot automatically understand arbitrary application transaction boundaries.
-
-Potential future strategies:
-
-* post-commit hooks
-* transactional context integration
-* explicit transaction-aware cache operations
-* event-based invalidation after commit
-
-For the initial version, avoid claiming transaction-awareness.
-
-This limitation must be clearly documented.
-
----
-
-# Async invalidation
-
-The library may eventually support asynchronous invalidation:
+Execution:
 
 ```text
-UPDATE PostgreSQL
+update(id, data)
       │
       ▼
-return response
+SQL update
       │
-      └── asynchronously invalidate cache
+      ▼
+updated User
+      │
+      ▼
+cache.set(userById)
+      │
+      ▼
+return User
 ```
 
-This reduces request latency but introduces an inconsistency window.
-
-Default behavior should remain synchronous and correctness-oriented.
-
-Async invalidation should always be explicit.
+Do not execute an unnecessary additional query when the mutation already returns the canonical result.
 
 ---
 
-# Write-behind
+# Explicit refresh
 
-Do not implement write-behind caching in the initial versions.
-
-The cache must never become the source of truth for repository mutations.
-
-Database writes should always occur before cache effects.
-
----
-
-# Source of truth
-
-The database / underlying repository remains canonical.
-
-The cache stores materialized query results.
-
-Think:
-
-```text
-cached query representation
-```
-
-not:
-
-```text
-secondary repository
-```
-
-Redis must not become an authoritative datastore through this library.
-
----
-
-# Bulk methods
-
-Methods such as:
-
-```ts
-findByIds(ids: string[])
-```
-
-introduce design choices.
-
-Two common strategies:
-
-### Query-level caching
-
-```text
-users:v1:1,2,3
-```
-
-### Entity-level caching
-
-```text
-user:v1:1
-user:v1:2
-user:v1:3
-```
-
-Entity-level caching enables partial hits but is significantly more complex.
-
-The first version should not automatically decompose bulk queries.
-
-Users should explicitly configure bulk-query resources.
-
-Future versions may introduce advanced helpers.
-
----
-
-# Pagination and filters
-
-Queries such as:
-
-```ts
-findAll({
-  page,
-  size,
-  sort,
-  status,
-  tenant,
-})
-```
-
-may create large numbers of cache keys.
-
-The library should not attempt to automatically optimize these.
-
-Configuration should remain explicit.
-
-Future tags or dependency graphs may help invalidate derived query caches.
-
----
-
-# Observability
-
-Caching must be observable.
-
-The library should expose structured events or hooks for:
-
-```text
-cache.hit
-cache.miss
-cache.get_error
-cache.set
-cache.set_error
-cache.invalidate
-cache.invalidate_error
-cache.write_through
-cache.coalesced
-cache.bypass
-```
-
-Useful dimensions:
-
-* provider
-* method
-* resource
-* backend
-* latency
-* cache result
-
-Avoid emitting full cache keys by default.
-
-Keys may contain business identifiers or sensitive information.
-
----
-
-# OpenTelemetry
-
-Future versions should consider OpenTelemetry integration.
-
-Potential spans:
-
-```text
-cache.get
-cache.set
-cache.invalidate
-repository.execute
-```
-
-Attributes:
-
-```text
-cache.resource
-cache.operation
-cache.hit
-cache.backend
-```
-
-Do not include raw values or full keys by default.
-
----
-
-# Metrics
-
-Potential metrics:
-
-```text
-cache_requests_total
-cache_hits_total
-cache_misses_total
-cache_errors_total
-cache_invalidations_total
-cache_coalesced_requests_total
-cache_operation_duration
-repository_fallback_total
-```
-
-Useful derived metric:
-
-```text
-hit ratio = hits / (hits + misses)
-```
-
-Metrics should integrate cleanly with existing observability systems rather than requiring a proprietary backend.
-
----
-
-# Debugging
-
-A debug mode may provide structured diagnostics.
+A provider method may optionally trigger another read method after mutation.
 
 Example:
 
 ```ts
-CacheProxyModule.forRoot({
-  debug: true,
-});
-```
+update: {
+  refresh: {
+    method: 'findById',
 
-Possible output:
-
-```text
-OrganizationRepository.findById
-resource=organization
-version=2
-cache=MISS
-repository=EXECUTED
-ttl=300s
-```
-
-Do not log full keys or cached values by default.
-
----
-
-# Cache bypass
-
-There should eventually be a way to intentionally bypass cache without modifying the repository.
-
-Potential use cases:
-
-* administration
-* diagnostics
-* retry flows
-* tests
-* forced refresh
-* backfills
-
-Possible future mechanism:
-
-```ts
-await cacheContext.run(
-  { bypass: true },
-  () => repository.findById(id),
-);
-```
-
-Avoid adding cache-specific arguments to repository methods.
-
----
-
-# Testing philosophy
-
-Repository tests should remain independent from caching.
-
-Example:
-
-```ts
-describe('OrganizationsPostgreRepository', () => {
-  // PostgreSQL behavior only
-});
-```
-
-Caching should be tested separately against:
-
-* cache configuration
-* proxy behavior
-* cache contracts
-
-The library should provide dedicated testing utilities.
-
----
-
-# Deterministic in-memory test backend
-
-The library should provide or recommend a deterministic in-memory test cache.
-
-Tests should not require Redis unless specifically testing Redis integration.
-
-Useful testing features:
-
-* explicit clear/reset
-* deterministic TTL
-* inspectable keys
-* inspectable values
-* fake clock compatibility
-
----
-
-# Fake clock
-
-TTL tests should not require real waiting.
-
-Potential helper:
-
-```ts
-const clock = createCacheTestClock();
-
-clock.advance('5m');
-```
-
-The exact implementation is flexible.
-
-A fake-clock-friendly design is preferred.
-
----
-
-# Cache behavior tests
-
-The library should make it easy to verify:
-
-* cache hit does not execute repository
-* cache miss executes repository
-* cache miss stores the result
-* TTL is applied
-* correct key is generated
-* null values are handled correctly
-* unconfigured methods pass through
-* repository errors propagate
-* cache failures follow fallback behavior
-* failed mutations do not invalidate cache
-* write-through stores the returned value
-* invalidation removes the correct resource
-
-Potential API:
-
-```ts
-expectCache(provider)
-  .method('findById')
-  .withArgs('123')
-  .toUseKey('organization:v1:123');
-```
-
-Exact syntax is not fixed.
-
----
-
-# Cache contract tests
-
-The library should support explicit cache contract tests.
-
-Example:
-
-```ts
-cacheContract({
-  provider: OrganizationRepository,
-  config: organizationCacheConfig,
-
-  cases: {
-    findById: [
-      {
-        args: ['123'],
-        expectedKey:
-          'organization:v1:123',
-      },
+    args: ({ args }) => [
+      args[0],
     ],
   },
-});
+}
 ```
 
-Alternative:
+Preferred order of strategies:
 
-```ts
-expectCacheKey(config)
-  .for('findById')
-  .withArgs('123')
-  .toBe('organization:v1:123');
-```
+1. write-through
+2. invalidation
+3. explicit refresh
 
-The goal is to make cache key changes intentional.
+Refresh should not be the default.
 
 ---
 
-# Method signature changes
+# Cache key contracts
+
+Cache keys are persistent contracts.
+
+Cached values may survive:
+
+* process restarts
+* deployments
+* rolling deployments
+* code refactors
+* provider signature changes
+* application version changes
+
+Keys must therefore be:
+
+* deterministic
+* versioned
+* strongly typed
+* testable
+
+---
+
+# Strong typing against provider methods
+
+Configuration should infer method names and arguments.
+
+Conceptually:
+
+```ts
+type MethodArgs<
+  T,
+  K extends keyof T,
+> =
+  T[K] extends (
+    ...args: infer A
+  ) => unknown
+    ? A
+    : never;
+```
+
+Given:
+
+```ts
+interface UserRepository {
+  matching(
+    criteria: Criteria,
+  ): Promise<User>;
+}
+```
+
+the key builder receives:
+
+```ts
+[Criteria]
+```
+
+If the method signature changes, the policy should receive the new argument tuple.
+
+---
+
+# Refactor safety
 
 Consider:
 
@@ -1920,358 +1332,721 @@ findById(
 )
 ```
 
-Protection should exist at several layers.
+The library should protect users through:
 
-## Compile-time
+1. TypeScript typing
+2. cache contract tests
+3. explicit resource versions
 
-Cache configuration should be typed against the current method signature.
+---
 
-## Test-time
+# Object parameters
 
-Existing contract tests should fail when key behavior changes.
+For complex cacheable methods, object parameters are preferable.
 
-## Runtime/deployment
+More fragile:
 
-Breaking semantic changes should use a resource version bump.
+```ts
+findById(
+  tenantId: string,
+  id: string,
+)
+```
+
+Safer:
+
+```ts
+findById({
+  tenantId,
+  id,
+}: FindUserQuery)
+```
+
+Then:
+
+```ts
+key: ([query]) => ({
+  tenantId:
+    query.tenantId,
+
+  id:
+    query.id,
+})
+```
+
+This gives better refactor safety.
+
+---
+
+# Resource versioning
+
+Resources should have explicit versions.
 
 Example:
 
 ```ts
-version: 1
+userById: {
+  version: 2,
+  ttl: '5m',
+  key: ([id]) => id,
+}
 ```
 
-becomes:
+Final key:
+
+```text
+userById:v2:123
+```
+
+A version bump should occur for breaking changes to:
+
+* key semantics
+* method argument interpretation
+* serialization format
+* result representation
+* tenant scope
+* authorization scope
+* query meaning
+
+---
+
+# Global namespaces
+
+The final key may contain:
+
+```text
+<app>:<environment>:<resource>:v<version>:<key>
+```
+
+Example:
+
+```text
+users-api:prod:userById:v2:123
+```
+
+Global prefixes should be configured once.
+
+---
+
+# Key collisions
+
+Key generation must be unambiguous.
+
+Bad:
 
 ```ts
-version: 2
+`${tenantId}${userId}`
 ```
+
+because:
+
+```text
+12 + 3 = 123
+1 + 23 = 123
+```
+
+Structured key inputs should help avoid this problem.
+
+---
+
+# Sensitive information in keys
+
+Avoid exposing:
+
+* passwords
+* tokens
+* API keys
+* JWTs
+* secrets
+* sensitive user data
+
+Future helpers may support deterministic hashing.
+
+Raw keys should not normally be logged.
+
+---
+
+# Multi-tenancy
+
+Tenant identity must be included whenever data depends on tenant scope.
+
+Unsafe:
+
+```ts
+key: ([id]) => id
+```
+
+when `id` is only unique within a tenant.
+
+Safe:
+
+```ts
+key: ([query]) => ({
+  tenantId:
+    query.tenantId,
+
+  id:
+    query.id,
+})
+```
+
+Cross-tenant cache collisions can become security vulnerabilities.
+
+---
+
+# Null and negative caching
+
+The cache layer must distinguish:
+
+```text
+MISS
+```
+
+from:
+
+```text
+cached null
+```
+
+A query returning `null` may optionally be cached.
+
+Example future option:
+
+```ts
+userById: {
+  cacheNull: true,
+  negativeTtl: '30s',
+}
+```
+
+This can prevent repeated queries for known missing values.
+
+---
+
+# Serialization
+
+Distributed caches may not preserve:
+
+* prototypes
+* `Date`
+* `BigInt`
+* `Map`
+* `Set`
+* value objects
+* custom classes
+
+The architecture should support serialization hooks:
+
+```ts
+serialize: value => ...
+deserialize: value => ...
+```
+
+A serialization format change may require a resource version bump.
+
+---
+
+# Local cache
+
+Local memory caches should work transparently.
+
+```text
+Nest process
+    │
+    ▼
+Memory cache
+    │
+    ▼
+Provider
+```
+
+Useful for:
+
+* development
+* tests
+* single-instance applications
+* very short-lived data
+
+Memory caches are process-local.
+
+---
+
+# Distributed cache
+
+Redis or another shared store allows:
+
+```text
+App A ─┐
+       │
+App B ─┼──► Redis
+       │
+App C ─┘
+```
+
+All instances can access shared cached data.
+
+---
+
+# Remote KV
+
+Keyv-compatible or custom adapters should allow other remote KV stores.
+
+The provider policy must remain backend-independent.
+
+---
+
+# Multi-level caching
+
+The architecture should not prevent:
+
+```text
+Provider Proxy
+      │
+      ▼
+L1 Memory
+      │
+      ▼
+L2 Redis
+      │
+      ▼
+Provider
+```
+
+However, L1 invalidation across multiple application instances is non-trivial.
+
+Do not claim strong consistency without propagation.
+
+---
+
+# Transactions
+
+Provider-level caching cannot automatically understand every database transaction.
+
+Unsafe scenario:
+
+```text
+UPDATE inside transaction
+        │
+        ▼
+cache invalidated
+        │
+        ▼
+transaction rollback
+```
+
+Future integrations may support:
+
+* post-commit hooks
+* transaction contexts
+* event-driven invalidation
+
+The initial version must document this limitation.
+
+---
+
+# Cache failures
+
+The default should normally be fail-open.
+
+```text
+cache GET fails
+      │
+      ▼
+execute provider
+```
+
+```text
+provider succeeds
+      │
+      ▼
+cache SET fails
+      │
+      ▼
+return provider result
+```
+
+Provider failures must always propagate.
+
+---
+
+# Cache operation timeouts
+
+A slow cache may be worse than a database call.
+
+Future support:
+
+```ts
+CacheProxyModule.forRoot({
+  timeout: {
+    get: '50ms',
+    set: '100ms',
+  },
+});
+```
+
+Timeouts may trigger fail-open behavior.
+
+---
+
+# Cache stampede
+
+Concurrent misses for the same key can generate excessive provider calls.
+
+Future `single-flight` / request coalescing:
+
+```text
+100 cache misses
+       │
+       ▼
+1 provider call
+       │
+       ▼
+shared result
+```
+
+Potential option:
+
+```ts
+coalesce: true
+```
+
+---
+
+# TTL jitter
+
+Future support may allow:
+
+```ts
+ttl: '5m',
+jitter: 0.1,
+```
+
+to avoid synchronized expirations.
+
+---
+
+# Bulk methods
+
+Methods such as:
+
+```ts
+findByIds(ids)
+```
+
+may either cache:
+
+* the entire query result
+* individual entities
+
+The first version should not automatically decompose bulk operations.
+
+Keep behavior explicit.
+
+---
+
+# Pagination and filtering
+
+Queries such as:
+
+```ts
+matching({
+  page,
+  size,
+  status,
+  tenant,
+})
+```
+
+may create many distinct cache entries.
+
+The library should not attempt automatic query optimization.
+
+Future cache tags may help invalidation.
+
+---
+
+# Cache tags
+
+Potential future feature:
+
+```ts
+tags: ({ result }) => [
+  'users',
+  `user:${result.id}`,
+]
+```
+
+Mutations may invalidate tags instead of enumerating every query resource.
+
+Not required for MVP.
+
+---
+
+# Observability
+
+The library should expose hooks/events for:
+
+```text
+cache.hit
+cache.miss
+cache.set
+cache.invalidate
+cache.error
+cache.bypass
+cache.coalesced
+```
+
+Useful dimensions:
+
+* provider
+* method
+* resource
+* backend
+* latency
+
+Do not emit complete keys or values by default.
+
+---
+
+# OpenTelemetry
+
+Potential spans:
+
+```text
+cache.get
+cache.set
+cache.invalidate
+provider.execute
+```
+
+Potential attributes:
+
+```text
+cache.resource
+cache.operation
+cache.hit
+cache.backend
+provider.name
+provider.method
+```
+
+---
+
+# Debugging
+
+Future debug mode:
+
+```ts
+CacheProxyModule.forRoot({
+  debug: true,
+});
+```
+
+Possible diagnostic:
+
+```text
+UserRepository.matching
+resource=userByCriteria
+version=2
+cache=MISS
+provider=EXECUTED
+ttl=300s
+```
+
+Avoid full cache values and sensitive keys.
+
+---
+
+# Cache bypass
+
+Applications may need to explicitly bypass cache without modifying provider interfaces.
+
+Potential future API:
+
+```ts
+cacheContext.run(
+  { bypass: true },
+  () =>
+    repository.matching(
+      criteria,
+    ),
+);
+```
+
+Do not add parameters such as:
+
+```ts
+matching(criteria, skipCache)
+```
+
+to application interfaces.
+
+---
+
+# Testing philosophy
+
+The concrete provider should continue being tested independently.
+
+Example:
+
+```ts
+describe(
+  'SqlUserRepository',
+  () => {
+    // SQL tests
+  },
+);
+```
+
+Cache behavior should be tested separately.
+
+---
+
+# Cache behavior testing
+
+Tests should cover:
+
+* hit skips provider
+* miss calls provider
+* miss stores result
+* TTL is applied
+* correct key is used
+* null handling
+* passthrough methods
+* provider errors
+* cache errors
+* invalidation
+* write-through
+
+---
+
+# Cache contract tests
+
+Example:
+
+```ts
+expectCacheKey(userCachePolicy)
+  .for('matching')
+  .withArgs(criteria)
+  .toBe(
+    'users-api:prod:userByCriteria:v1:...',
+  );
+```
+
+Or:
+
+```ts
+cacheContract({
+  provider: UserRepository,
+  policy: userCachePolicy,
+
+  cases: {
+    matching: [
+      {
+        args: [criteria],
+        expectedKey:
+          'userByCriteria:v1:...',
+      },
+    ],
+  },
+});
+```
+
+The exact testing API may evolve.
 
 ---
 
 # Cache contract snapshots
 
-A future CLI may store cache contracts.
-
-Example:
+Potential future file:
 
 ```text
 .cache-contract.json
 ```
 
-```json
-{
-  "OrganizationRepository.findById": {
-    "resource": "organization",
-    "version": 1,
-    "exampleKey": "organization:v1:123"
-  }
-}
-```
-
-Potential command:
+Potential CLI:
 
 ```bash
 nestjs-cache-proxy check
 ```
 
-Example output:
+It may detect:
 
-```text
-BREAKING CACHE CONTRACT
-
-OrganizationRepository.findById
-
-Previous:
-organization:v1:123
-
-Current:
-organization:v1:tenant-a:123
-
-Consider bumping:
-
-organization.version: 1 -> 2
-```
-
-This is not required for MVP.
-
----
-
-# CI integration
-
-Future CI validation may detect:
-
-* unknown methods
-* removed configured methods
-* unknown resources
-* invalid invalidation targets
 * changed keys
-* stale cache contracts
+* changed resources
+* removed methods
 * missing version bumps
-* collisions in declared fixtures
-
-Potential command:
-
-```bash
-nestjs-cache-proxy check
-```
-
-Cache contract changes should be visible during code review.
+* collisions
+* invalid references
 
 ---
 
-# Invalid configuration
+# Deterministic test cache
 
-Configuration errors should fail early.
+Tests should have access to a deterministic in-memory cache or recommended testing adapter.
 
-Examples:
+Useful features:
 
-* configured method does not exist
-* configured property is not callable
-* resource does not exist
-* write-through targets unknown resource
-* invalidation targets unknown resource
-* invalid TTL
-* invalid version
-* duplicate unsafe namespace/version combinations
-
-Compile-time checks should catch as much as possible.
-
-Runtime validation should cover what TypeScript cannot guarantee.
-
----
-
-# Security considerations
-
-Caching can accidentally broaden data visibility.
-
-The library documentation must highlight:
-
-* multi-tenant isolation
-* user-specific queries
-* permission-dependent queries
-* authorization-sensitive results
-* sensitive values in keys
-* sensitive values in logs
-* shared cache risks
-
-Example:
-
-```ts
-findProfile(userId)
-```
-
-must not produce a key that accidentally ignores authorization scope if returned data differs by caller.
-
-Cache policy must model all input dimensions that materially affect the returned result.
-
----
-
-# Authorization-sensitive caching
-
-If:
-
-```ts
-findDocument(documentId, currentUser)
-```
-
-returns different representations depending on permissions, then:
-
-```text
-document:<documentId>
-```
-
-is unsafe.
-
-The relevant authorization context must either:
-
-* be part of the key
-* produce a user-scoped resource
-* disable caching
-
-The library should not attempt to automatically infer this.
-
----
-
-# Cache failures and consistency
-
-Cache operations should never silently alter source-of-truth semantics.
-
-Default behavior:
-
-```text
-cache failure
-   │
-   ▼
-fallback to repository
-```
-
-The application should generally remain functional if Redis is unavailable.
-
-However, stale cache consistency cannot always be solved by fail-open behavior.
-
-Documentation must distinguish:
-
-* availability
-* consistency
-* freshness
-
----
-
-# Rolling deployments
-
-Multiple application versions may run simultaneously.
-
-Example:
-
-```text
-App v1
-App v1
-App v2
-App v2
-```
-
-Resource versioning helps isolate incompatible values.
-
-Example:
-
-```text
-organization:v1:123
-organization:v2:123
-```
-
-This should be treated as a first-class design consideration.
+* clear/reset
+* inspect keys
+* inspect values
+* deterministic TTL
+* fake-clock compatibility
 
 ---
 
 # Reusable policies
 
-The library should eventually support reusable cache configuration.
+Reusable definitions should eventually be supported.
 
 Example:
 
 ```ts
 const entityCache =
   defineCacheResource({
-    ttl: '5m',
     version: 1,
-  });
-```
-
-Usage:
-
-```ts
-organization: entityCache({
-  key: ([id]) => `${id}`,
-})
-```
-
-This reduces duplication across repositories.
-
-Other possible reusable policies:
-
-```ts
-shortLivedEntityCache
-longLivedReferenceCache
-tenantScopedEntityCache
-```
-
----
-
-# Configuration location
-
-Cache behavior should be visible from the composition root.
-
-Preferred:
-
-```ts
-@Module({
-  providers: [
-    cachedProvider({
-      // complete cache policy
-    }),
-  ],
-})
-```
-
-Acceptable alternative:
-
-```ts
-const organizationCache =
-  defineCachePolicy<OrganizationRepository>({
-    // ...
-  });
-```
-
-then:
-
-```ts
-cachedProvider({
-  provide: OrganizationRepository,
-  useClass: PostgreOrganizationRepository,
-  policy: organizationCache,
-});
-```
-
-Both keep caching outside the repository implementation.
-
----
-
-# Separate policy files
-
-Large applications should be able to keep cache configuration outside Nest modules.
-
-Example:
-
-```text
-organizations/
-├── organization.repository.ts
-├── organization.repository.postgres.ts
-├── organization.cache-policy.ts
-└── organization.module.ts
-```
-
-Example:
-
-```ts
-export const organizationCachePolicy =
-  defineCachePolicy<OrganizationRepository>({
-    resources: {
-      // ...
-    },
-
-    methods: {
-      // ...
-    },
+    ttl: '5m',
   });
 ```
 
 Then:
 
 ```ts
-cachedProvider({
-  provide: OrganizationRepository,
-  useClass: PostgreOrganizationRepository,
-  policy: organizationCachePolicy,
-});
+userById: entityCache({
+  key: ([id]) => id,
+})
 ```
-
-This keeps modules readable without contaminating repository code.
 
 ---
 
-# Example final developer experience
+# Example complete application configuration
+
+Policy:
 
 ```ts
-export const organizationCachePolicy =
-  defineCachePolicy<OrganizationRepository>({
+export const userCachePolicy =
+  defineCachePolicy<UserRepository>({
     resources: {
-      organization: {
+      userById: {
         version: 1,
         ttl: '5m',
-        key: ([id]) => `${id}`,
+        key: ([id]) => id,
       },
 
-      organizations: {
+      userByCriteria: {
+        version: 1,
+        ttl: '2m',
+
+        key: ([criteria]) => ({
+          tenantId:
+            criteria.tenantId,
+
+          email:
+            criteria.email,
+        }),
+      },
+
+      users: {
         version: 1,
         ttl: '1m',
         key: () => 'all',
@@ -2280,208 +2055,359 @@ export const organizationCachePolicy =
 
     methods: {
       findById: {
-        cache: 'organization',
+        cache: 'userById',
       },
 
-      findAll: {
-        cache: 'organizations',
+      matching: {
+        cache:
+          'userByCriteria',
+      },
+
+      save: {
+        invalidate: [
+          'users',
+          'userByCriteria',
+        ],
       },
 
       update: {
         writeThrough: {
-          resource: 'organization',
-          keyArgs: ({ args }) => [
-            args[0],
-          ],
-          value: ({ result }) => result,
+          resource:
+            'userById',
+
+          keyArgs:
+            ({ args }) => [
+              args[0],
+            ],
+
+          value:
+            ({ result }) =>
+              result,
         },
 
         invalidate: [
-          'organizations',
-        ],
-      },
-
-      create: {
-        invalidate: [
-          'organizations',
+          'users',
+          'userByCriteria',
         ],
       },
 
       delete: {
         invalidate: [
-          'organization',
-          'organizations',
+          'userById',
+          'userByCriteria',
+          'users',
         ],
       },
     },
   });
 ```
 
-Nest module:
+Application cache module:
 
 ```ts
 @Module({
   imports: [
-    CacheModule.register({
-      // configured backend
-    }),
+    CacheProxyModule.forFeature([
+      {
+        provide:
+          UserRepository,
+
+        useClass:
+          SqlUserRepository,
+
+        policy:
+          userCachePolicy,
+      },
+    ]),
+  ],
+
+  exports: [
+    CacheProxyModule,
+  ],
+})
+export class ApplicationCacheModule {}
+```
+
+Users module:
+
+```ts
+@Module({
+  imports: [
+    ApplicationCacheModule,
   ],
 
   providers: [
-    cachedProvider({
-      provide: OrganizationRepository,
-      useClass: PostgreOrganizationRepository,
-      policy: organizationCachePolicy,
-    }),
+    UserByCriteriaSearcher,
   ],
 })
-export class OrganizationModule {}
+export class UsersModule {}
 ```
 
-Business code:
+Use case:
 
 ```ts
 @Injectable()
-export class GetOrganization {
+export class UserByCriteriaSearcher {
   constructor(
     private readonly repository:
-      OrganizationRepository,
+      UserRepository,
   ) {}
 
-  execute(id: string) {
-    return this.repository.findById(id);
+  execute(criteria: Criteria) {
+    return this.repository.matching(
+      criteria,
+    );
   }
 }
 ```
 
-Repository implementation:
+Concrete repository:
 
 ```ts
 @Injectable()
-export class PostgreOrganizationRepository
-  implements OrganizationRepository {
+export class SqlUserRepository
+  implements UserRepository {
 
-  findById(id: string) {
-    return this.database.organization.findUnique({
-      where: { id },
-    });
+  async matching(
+    criteria: Criteria,
+  ): Promise<User> {
+    // SQL
   }
 
-  findAll() {
-    return this.database.organization.findMany();
-  }
-
-  update(
+  async findById(
     id: string,
-    data: Organization,
-  ) {
-    return this.database.organization.update({
-      where: { id },
-      data,
-    });
+  ): Promise<User | null> {
+    // SQL
   }
 
-  delete(id: string) {
-    return this.database.organization.delete({
-      where: { id },
-    });
+  async save(
+    user: User,
+  ): Promise<void> {
+    // SQL
+  }
+
+  async update(
+    id: string,
+    user: User,
+  ): Promise<User> {
+    // SQL
+  }
+
+  async delete(
+    id: string,
+  ): Promise<void> {
+    // SQL
   }
 }
 ```
 
-Neither the business code nor the repository implementation knows that caching exists.
+Runtime structure:
+
+```text
+UserByCriteriaSearcher
+        │
+        ▼
+UserRepository token
+        │
+        ▼
+Caching Proxy
+        │
+        ├── CACHE_MANAGER
+        │
+        ▼
+SqlUserRepository
+        │
+        ▼
+PostgreSQL
+```
 
 ---
 
-# Example refactor scenario
+# Example caching a use case instead
 
-Initial repository:
+The same mechanism must support application services or use cases.
+
+Example:
 
 ```ts
-interface OrganizationRepository {
-  findById(
-    id: string,
-  ): Promise<Organization | null>;
+export abstract class
+  UserByCriteriaSearcher {
+
+  abstract execute(
+    criteria: Criteria,
+  ): Promise<User>;
 }
 ```
 
-Configuration:
+Concrete implementation:
 
 ```ts
-organization: {
-  version: 1,
-  key: ([id]) => `${id}`,
+@Injectable()
+export class
+  DefaultUserByCriteriaSearcher
+  implements UserByCriteriaSearcher {
+
+  constructor(
+    private readonly repository:
+      UserRepository,
+  ) {}
+
+  execute(criteria: Criteria) {
+    return this.repository.matching(
+      criteria,
+    );
+  }
 }
 ```
 
-Generated key:
+Policy:
+
+```ts
+export const userSearcherCache =
+  defineCachePolicy<
+    UserByCriteriaSearcher
+  >({
+    resources: {
+      searchResult: {
+        version: 1,
+        ttl: '2m',
+
+        key: ([criteria]) => ({
+          tenantId:
+            criteria.tenantId,
+
+          email:
+            criteria.email,
+        }),
+      },
+    },
+
+    methods: {
+      execute: {
+        cache:
+          'searchResult',
+      },
+    },
+  });
+```
+
+Registration:
+
+```ts
+CacheProxyModule.forFeature([
+  {
+    provide:
+      UserByCriteriaSearcher,
+
+    useClass:
+      DefaultUserByCriteriaSearcher,
+
+    policy:
+      userSearcherCache,
+  },
+])
+```
+
+Runtime:
 
 ```text
-organization:v1:123
+Controller
+   │
+   ▼
+UserByCriteriaSearcher
+   │
+   ▼
+Caching Proxy
+   │
+   ▼
+DefaultUserByCriteriaSearcher
+   │
+   ▼
+UserRepository
 ```
 
-Later:
-
-```ts
-interface OrganizationRepository {
-  findById(
-    tenantId: string,
-    id: string,
-  ): Promise<Organization | null>;
-}
-```
-
-New policy:
-
-```ts
-organization: {
-  version: 2,
-
-  key: ([tenantId, id]) =>
-    `${tenantId}:${id}`,
-}
-```
-
-Generated key:
-
-```text
-organization:v2:tenant-a:123
-```
-
-Expected protections:
-
-1. TypeScript makes the signature change visible.
-2. Cache contract tests detect the changed key.
-3. Developer intentionally increments the resource version.
-4. Old and new deployment versions do not reuse incompatible cache entries.
+This demonstrates that repository caching is not a special case in the library architecture.
 
 ---
 
-# MVP scope
+# Where to cache
 
-The first usable version should support:
+Caching different layers has different semantics.
 
-1. NestJS custom provider integration
-2. transparent provider proxy
-3. strongly typed method configuration
-4. explicit cache resources
-5. cache-aside reads
-6. deterministic keys
-7. resource namespaces
-8. resource versioning
-9. TTL
-10. invalidation
-11. write-through
-12. passthrough for unconfigured methods
-13. `CACHE_MANAGER` integration
-14. local memory cache compatibility
-15. Redis/Keyv compatibility
-16. fail-open cache behavior
-17. null/miss distinction
-18. basic serialization expectations
-19. unit-test helpers
-20. cache key contract tests
-21. invalid configuration validation
+## Repository cache
+
+```text
+Use Case
+   │
+   ▼
+Cached Repository
+   │
+   ▼
+Database
+```
+
+Advantages:
+
+* reusable across multiple use cases
+* close to the persistence query
+* fine-grained data caching
+
+## Use-case cache
+
+```text
+Controller
+   │
+   ▼
+Cached Use Case
+   │
+   ▼
+Repositories / Services
+```
+
+Advantages:
+
+* caches final application results
+* may avoid multiple repository calls
+* may cache expensive calculations
+
+Trade-off:
+
+* invalidation may become semantically broader
+
+The library should support both rather than deciding where applications must cache.
+
+---
+
+# MVP
+
+The MVP should include:
+
+1. `cachedProvider`
+2. `defineCachePolicy`
+3. `CacheProxyModule.forRoot`
+4. `CacheProxyModule.forFeature`
+5. `useClass` provider wrapping
+6. ideally `useExisting`
+7. JavaScript runtime proxy
+8. strongly typed provider methods
+9. explicit resources
+10. cache-aside
+11. passthrough methods
+12. TTL
+13. deterministic keys
+14. structured key input
+15. namespaces
+16. resource versions
+17. invalidation
+18. write-through
+19. `CACHE_MANAGER` integration
+20. memory compatibility
+21. Redis/Keyv compatibility
+22. null/miss distinction
+23. fail-open cache errors
+24. cache contract testing
+25. configuration validation
+26. centralized cache-module support
 
 ---
 
@@ -2490,24 +2416,25 @@ The first usable version should support:
 High-value next features:
 
 * negative caching
-* request coalescing / single-flight
+* request coalescing
 * TTL jitter
+* serialization hooks
 * metrics
 * OpenTelemetry
-* reusable policies
-* explicit bypass context
-* configurable timeouts
-* improved serialization hooks
+* reusable resource policies
+* explicit cache bypass
+* operation timeouts
+* advanced policy classes
 
 ---
 
 # Future scope
 
-Potential future features:
+Potential features:
 
 * cache tags
-* cache dependency graphs
-* multi-level L1/L2 policies
+* dependency graphs
+* L1/L2 caching
 * distributed L1 invalidation
 * Redis Pub/Sub
 * event-driven invalidation
@@ -2515,36 +2442,33 @@ Potential future features:
 * stale-while-revalidate
 * circuit breaker
 * named cache tiers
-* store selection per resource
-* cache contract snapshots
+* store selection by resource
+* contract snapshots
 * CLI validation
-* CI checks
-* key collision fixtures
-* resource-generation invalidation
-* transaction integration
-* ORM-specific helpers
+* CI validation
+* key collision testing
+* transaction-aware integration
 * bulk entity caching
-* configurable consistency models
+* custom consistency models
 
 ---
 
 # Explicitly out of scope
 
-Do not initially implement:
+Initially avoid:
 
 * HTTP caching
-* `Cache-Control`
 * ETags
+* `Cache-Control`
 * CDN integration
 * database replication
 * write-behind
-* automatic read/write detection based on method names
-* decorators on repositories
-* source-code generation
-* Redis-specific APIs
-* automatic ORM query parsing
+* automatic classification based on method names
+* decorators inside cached providers
+* ORM query parsing
 * automatic transaction interception
-* automatic cache-key migration
+* automatic cache migrations
+* Redis-specific policy syntax
 
 ---
 
@@ -2554,212 +2478,176 @@ Prioritize:
 
 * transparency
 * type safety
+* explicit policies
+* centralized configuration
 * minimal boilerplate
+* NestJS-native DI
 * dependency inversion
-* explicit configuration
-* compatibility with NestJS DI
 * backend independence
-* predictable behavior
-* testability
-* refactor safety
 * deterministic cache contracts
+* refactor safety
 * observability
+* testability
 * correctness
 
 Avoid:
 
 * hidden magic
-* implicit method classification
-* repository decorators
-* backend-specific policy configuration
-* duplicated cache key definitions
-* unsafe serialization assumptions
-* silently swallowed repository errors
+* cache annotations inside domain/application providers
+* duplicated key definitions
+* backend-specific policies
+* unsafe implicit serialization
+* silently swallowed provider errors
+* coupling consumers to caching
 
 ---
 
 # Core invariants
 
-The implementation should preserve these invariants:
+## 1. The wrapped provider remains the source of truth
 
-### 1. The repository is the source of truth
+Caching must not replace the underlying operation semantics.
 
-Cache state must never replace repository persistence.
+## 2. The wrapped implementation remains cache-agnostic
 
-### 2. The repository implementation is cache-agnostic
+No cache dependencies belong inside it.
 
-No cache-specific code belongs inside the concrete implementation.
+## 3. Consumers remain cache-agnostic
 
-### 3. The consumer is cache-agnostic
+The injected token remains unchanged.
 
-Injected provider semantics remain unchanged.
+## 4. The cache proxy is transparent
 
-### 4. Unconfigured methods are transparent
+Configured behavior aside, the provider should behave exactly as before.
 
-They execute exactly as the underlying provider would.
+## 5. Unconfigured methods are passthrough
 
-### 5. Repository failures propagate
+They execute directly against the concrete provider.
 
-Caching must never hide repository failures.
+## 6. Provider failures propagate
 
-### 6. Cache failures should normally fail open
+Caching must never hide underlying failures.
 
-A cache outage should not normally make the repository unavailable.
+## 7. Cache failures normally fail open
 
-### 7. Mutations happen before cache effects
+An unavailable cache should normally not make the provider unavailable.
 
-Never update cache based on an unsuccessful source-of-truth operation.
+## 8. Mutations happen before cache effects
 
-### 8. Keys are contracts
+Never update cache based on a failed source-of-truth mutation.
 
-Changes to key semantics must be explicit and testable.
+## 9. Cache keys are contracts
 
-### 9. Versions isolate incompatible representations
+Changes must be deliberate and testable.
 
-Breaking cache changes should use new resource versions.
+## 10. Versions isolate incompatible representations
 
-### 10. Backend technology does not leak into resource policy
+Breaking changes should move to a new resource version.
 
-A repository policy should work with memory, Redis, or compatible stores without changing its semantics.
+## 11. Policies describe semantics, not backend technology
 
----
+The same policy should work with memory, Redis, or another compatible store.
 
-# Testing requirements
+## 12. Caching belongs to composition
 
-The project test suite must cover at minimum:
-
-## Proxy behavior
-
-* method arguments preserved
-* return values preserved
-* async methods preserved
-* sync methods preserved
-* `this` binding preserved
-* property access preserved
-* unconfigured methods pass through
-
-## Reads
-
-* cache hit returns cached value
-* cache hit skips repository
-* cache miss executes repository
-* cache miss stores repository result
-* TTL forwarded
-* correct resource key used
-
-## Null handling
-
-* cached null is distinguishable from miss
-* optional negative caching works correctly
-
-## Invalidations
-
-* correct key invalidated
-* multiple resources invalidated
-* invalidation happens after successful mutation
-* failed mutation does not invalidate
-
-## Write-through
-
-* repository executes first
-* returned canonical value written to cache
-* correct cache key derived from mutation args
-* no unnecessary extra read occurs
-
-## Errors
-
-* repository error propagates unchanged
-* cache GET failure falls back
-* cache SET failure does not discard repository result
-* invalidation failure follows configured policy
-
-## Contracts
-
-* keys deterministic
-* resource version included
-* namespace included
-* refactor fixtures generate expected keys
-* collision fixtures do not collide
-* invalid resources rejected
-* unknown methods rejected
-
-## Backend integration
-
-* in-memory integration
-* NestJS `CACHE_MANAGER`
-* Redis-compatible integration test
-
-## Security
-
-* multi-tenant keys isolate tenants
-* sensitive values are not unintentionally logged
+Applications should be able to configure caching entirely from NestJS modules or external policy files.
 
 ---
 
-# First implementation plan
+# Initial implementation plan
 
-Before implementing the full feature set:
-
-## Phase 1 — API design
+## Phase 1 — Public API
 
 Define:
 
 * `cachedProvider`
 * `defineCachePolicy`
+* `CacheProxyModule`
+* `forRoot`
+* `forFeature`
+* provider policy types
 * resource types
-* method configuration types
-* key builders
-* generic method inference
+* method inference
+* structured key types
 
-Focus heavily on TypeScript inference.
+Do not implement substantial runtime behavior before the public TypeScript API is coherent.
 
 ---
 
-## Phase 2 — Minimal proxy
+## Phase 2 — Minimal runtime proxy
 
 Implement:
 
 ```text
-method
-  ↓
+method call
+   │
+   ▼
 cache GET
-  ↓ miss
-repository
-  ↓
+   │
+   ▼ miss
+concrete provider
+   │
+   ▼
 cache SET
+   │
+   ▼
+return
 ```
 
-Support one configured read method.
-
-Add tests.
+Support a single read resource.
 
 ---
 
-## Phase 3 — NestJS integration
-
-Integrate with:
-
-* custom providers
-* `CACHE_MANAGER`
-* concrete provider registration
-
-Verify that consumers still receive the expected token.
-
----
-
-## Phase 4 — Keys and contracts
+## Phase 3 — NestJS DI
 
 Implement:
 
-* resource names
-* namespaces
-* versions
-* deterministic final keys
-* testing helpers
+```text
+public token
+    │
+    ▼
+factory provider
+    │
+    ├── concrete implementation
+    ├── CACHE_MANAGER
+    └── cache policy
+```
+
+Verify transparent injection.
 
 ---
 
-## Phase 5 — Mutations
+## Phase 4 — Dynamic modules
+
+Implement:
+
+```ts
+CacheProxyModule.forRoot(...)
+```
+
+and:
+
+```ts
+CacheProxyModule.forFeature(...)
+```
+
+Verify that applications can create a dedicated `ApplicationCacheModule`.
+
+---
+
+## Phase 5 — Key contracts
+
+Implement:
+
+* namespace
+* resource name
+* version
+* deterministic canonical key encoding
+* contract testing helpers
+
+---
+
+## Phase 6 — Mutations
 
 Implement:
 
@@ -2769,87 +2657,108 @@ Implement:
 
 ---
 
-## Phase 6 — Error handling
+## Phase 7 — Resilience
 
 Implement:
 
 * cache fail-open
-* repository error propagation
+* provider error propagation
 * cache operation error hooks
 
 ---
 
-## Phase 7 — Null handling and serialization
+## Phase 8 — Null and serialization boundaries
 
 Implement:
 
-* miss sentinel
+* cache miss sentinel
 * cached null
-* serialization boundaries
+* documented serialization semantics
 
 ---
 
-## Phase 8 — Testing utilities
+## Phase 9 — Testing utilities
 
-Provide helpers for:
+Provide:
 
-* key generation
-* cache behavior
-* contract assertions
-* deterministic in-memory testing
+* deterministic test cache
+* key assertions
+* cache behavior assertions
+* contract tests
 
 ---
 
-## Phase 9 — Integration tests
+## Phase 10 — Integration tests
 
 Test:
 
-* NestJS module
+* provider proxying
+* `forRoot`
+* `forFeature`
+* centralized cache modules
 * memory cache
-* Redis-compatible store
+* Redis-compatible backend
+* repository provider
+* use-case provider
 
 ---
 
-## Phase 10 — Documentation
+# Long-term direction
 
-Document:
-
-* architecture
-* cache-aside
-* invalidation
-* write-through
-* key contracts
-* versioning
-* multi-tenancy
-* backend selection
-* failure semantics
-* transaction limitations
-* testing
-
----
-
-# Long-term project direction
-
-The long-term value of `nestjs-cache-proxy` should come from combining:
+The value proposition should remain:
 
 ```text
 NestJS DI
     +
 transparent provider proxies
     +
-declarative cache policies
+declarative TypeScript policies
     +
-strong TypeScript inference
+centralized cache composition
+    +
+strong type inference
     +
 versioned cache contracts
     +
 backend independence
     +
-testing and observability
+testing
+    +
+observability
 ```
 
-The project should remain focused.
+`nestjs-cache-proxy` should make adding application-level caching feel like a dependency-injection configuration concern rather than something that requires rewriting providers.
 
-It should not become a distributed datastore, HTTP cache framework, ORM abstraction, or Redis wrapper.
+The ideal developer experience is:
 
-Its purpose is to make application-level caching in NestJS transparent, explicit, testable and difficult to misuse.
+```ts
+CacheProxyModule.forFeature([
+  {
+    provide: UserRepository,
+    useClass: SqlUserRepository,
+    policy: userCachePolicy,
+  },
+])
+```
+
+while this:
+
+```ts
+export class UserByCriteriaSearcher {
+  constructor(
+    private readonly repository:
+      UserRepository,
+  ) {}
+}
+```
+
+and this:
+
+```ts
+export class SqlUserRepository
+  implements UserRepository {
+  // ...
+}
+```
+
+remain completely unaware that caching exists.
