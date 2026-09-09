@@ -19,6 +19,32 @@ A cached provider may be:
 
 The provider implementation and its consumers must remain unaware that caching exists.
 
+## MVP delivery baseline
+
+This document describes both the initial product and its longer-term direction. The
+authoritative, executable delivery sequence is the [iteration plan](iterations/README.md).
+Where an exploratory example in this document is broader than that plan, the following
+MVP constraints take precedence:
+
+* only methods returning `Promise<T>` may declare cache behavior; synchronous methods,
+  Observables, streams, async iterables, and callback APIs are not adapted
+* wrapped providers are singleton-scoped and identified by runtime NestJS tokens
+* `useClass` is the only implementation ownership model; `useExisting` is post-MVP
+* invalidation deletes explicitly derived exact keys; resource-wide deletion is valid
+  only for a resource whose key is constant
+* TTL values are positive integer milliseconds at the library boundary
+* an internal versioned value envelope distinguishes a miss from a cached `null`;
+  `undefined` is never cached
+* cache operation failures fail open and are reported through a minimal error hook,
+  while provider failures always propagate
+* key version changes isolate incompatible entries but neither migrate nor eagerly
+  remove previous entries
+
+These constraints preserve the plug-and-play goal: provider implementations and their
+consumers remain unchanged. Explicit configuration is confined to module composition
+and TypeScript policy declarations because key identity, tenant boundaries, TTL, and
+mutation effects cannot be inferred safely.
+
 Conceptually:
 
 ```text
@@ -415,7 +441,7 @@ Good:
 ```ts
 organization: {
   version: 1,
-  ttl: '5m',
+  ttl: 300_000,
   key: ([id]) => id,
 }
 ```
@@ -669,7 +695,7 @@ This is the simplest developer experience.
 
 ---
 
-# Model B — cache module wraps an existing provider
+# Model B — cache module wraps an existing provider (post-MVP)
 
 Infrastructure modules may own the concrete provider.
 
@@ -726,7 +752,9 @@ Caching Proxy
 UserRepository
 ```
 
-The library should ideally support both `useClass` and `useExisting`.
+The library should eventually support both `useClass` and `useExisting`. The MVP supports
+only `useClass`. `useExisting` requires a separate design pass covering module visibility,
+exports, scopes, duplicate public tokens, and dependency cycles.
 
 ---
 
@@ -821,7 +849,7 @@ export const userCachePolicy =
     resources: {
       userByCriteria: {
         version: 1,
-        ttl: '5m',
+        ttl: 300_000,
 
         key: ([criteria]) => ({
           tenantId:
@@ -1009,13 +1037,13 @@ Example:
 resources: {
   userById: {
     version: 1,
-    ttl: '5m',
+    ttl: 300_000,
     key: ([id]) => id,
   },
 
   userByCriteria: {
     version: 1,
-    ttl: '1m',
+    ttl: 60_000,
 
     key: ([criteria]) => ({
       tenantId:
@@ -1033,6 +1061,9 @@ Resources should define:
 * key derivation
 * TTL
 * version
+
+For the MVP, TTL is a positive integer number of milliseconds. Duration strings in
+future-facing examples are not part of the initial public API.
 
 Potential additional options:
 
@@ -1145,18 +1176,24 @@ No other behavior should be added.
 
 ---
 
-# Invalidation
+# Exact-key invalidation
 
-A mutation may invalidate cached resources.
+A mutation may invalidate explicitly derived cache entries. The MVP does not enumerate
+all keys belonging to a dynamic resource: cache-manager/Keyv does not provide a portable
+prefix scan or resource-wide delete contract.
 
 Example:
 
 ```ts
 methods: {
   save: {
-    invalidate: [
-      'userByCriteria',
-      'users',
+    effects: [
+      {
+        invalidate: {
+          resource: 'userById',
+          keyArgs: ({ args }) => [args[0].id],
+        },
+      },
     ],
   },
 }
@@ -1174,13 +1211,17 @@ SqlUserRepository.save(user)
 success
    │
    ▼
-invalidate configured resources
+delete configured exact keys
    │
    ▼
 return
 ```
 
 If the repository operation fails, invalidation must not happen.
+
+A resource-wide invalidation is only equivalent to exact-key deletion when the resource
+has one constant key. Dynamic resource invalidation requires tags, an index, generations,
+or backend-specific scanning and is post-MVP.
 
 ---
 
@@ -1192,16 +1233,20 @@ Example:
 
 ```ts
 update: {
-  writeThrough: {
-    resource: 'userById',
+  effects: [
+    {
+      writeThrough: {
+        resource: 'userById',
 
-    keyArgs: ({ args }) => [
-      args[0],
-    ],
+        keyArgs: ({ args }) => [
+          args[0],
+        ],
 
-    value: ({ result }) =>
-      result,
-  },
+        value: ({ result }) =>
+          result,
+      },
+    },
+  ],
 }
 ```
 
@@ -1227,7 +1272,7 @@ Do not execute an unnecessary additional query when the mutation already returns
 
 ---
 
-# Explicit refresh
+# Explicit refresh (post-MVP)
 
 A provider method may optionally trigger another read method after mutation.
 
@@ -1245,7 +1290,9 @@ update: {
 }
 ```
 
-Preferred order of strategies:
+When a mutation combines strategies, the MVP represents them as an `effects` array and
+executes them sequentially in declaration order. Policy validation should reject an effect
+sequence that writes and then deletes the same exact key. Preferred strategy selection is:
 
 1. write-through
 2. invalidation
@@ -1280,6 +1327,10 @@ Keys must therefore be:
 # Strong typing against provider methods
 
 Configuration should infer method names and arguments.
+
+In the MVP, configured method names are restricted to methods returning `Promise<T>`.
+Unconfigured methods retain normal passthrough behavior regardless of their return type.
+The proxy must not convert a synchronous or streaming contract into a promise.
 
 Conceptually:
 
@@ -1387,7 +1438,7 @@ Example:
 ```ts
 userById: {
   version: 2,
-  ttl: '5m',
+  ttl: 300_000,
   key: ([id]) => id,
 }
 ```
@@ -1494,7 +1545,7 @@ Cross-tenant cache collisions can become security vulnerabilities.
 
 ---
 
-# Null and negative caching
+# Null, misses, and negative caching
 
 The cache layer must distinguish:
 
@@ -1508,9 +1559,11 @@ from:
 cached null
 ```
 
-A query returning `null` may optionally be cached.
+A versioned internal envelope distinguishes stored values from backend miss values. Falsy
+values and `null` can therefore be cached without ambiguity. `undefined` is never cached.
+Configurable negative caching policy and a separate negative TTL remain post-MVP.
 
-Example future option:
+Example post-MVP option:
 
 ```ts
 userById: {
@@ -1667,6 +1720,9 @@ return provider result
 
 Provider failures must always propagate.
 
+The MVP reports cache get, set, and delete failures through a minimal, non-throwing error
+hook. Hook payloads must identify the operation without exposing raw keys or values.
+
 ---
 
 # Cache operation timeouts
@@ -1784,7 +1840,7 @@ Not required for MVP.
 
 # Observability
 
-The library should expose hooks/events for:
+The longer-term library should expose hooks/events for:
 
 ```text
 cache.hit
@@ -1795,6 +1851,9 @@ cache.error
 cache.bypass
 cache.coalesced
 ```
+
+The MVP exposes only the redacted cache error hook described above. Hit/miss metrics,
+general event streams, and OpenTelemetry integration are post-MVP.
 
 Useful dimensions:
 
@@ -2005,7 +2064,7 @@ Example:
 const entityCache =
   defineCacheResource({
     version: 1,
-    ttl: '5m',
+    ttl: 300_000,
   });
 ```
 
@@ -2029,26 +2088,13 @@ export const userCachePolicy =
     resources: {
       userById: {
         version: 1,
-        ttl: '5m',
+        ttl: 300_000,
         key: ([id]) => id,
-      },
-
-      userByCriteria: {
-        version: 1,
-        ttl: '2m',
-
-        key: ([criteria]) => ({
-          tenantId:
-            criteria.tenantId,
-
-          email:
-            criteria.email,
-        }),
       },
 
       users: {
         version: 1,
-        ttl: '1m',
+        ttl: 60_000,
         key: () => 'all',
       },
     },
@@ -2058,49 +2104,67 @@ export const userCachePolicy =
         cache: 'userById',
       },
 
-      matching: {
-        cache:
-          'userByCriteria',
-      },
-
       save: {
-        invalidate: [
-          'users',
-          'userByCriteria',
+        effects: [
+          {
+            invalidate: {
+              resource: 'users',
+              keyArgs: () => [],
+            },
+          },
         ],
       },
 
       update: {
-        writeThrough: {
-          resource:
-            'userById',
+        effects: [
+          {
+            writeThrough: {
+              resource:
+                'userById',
 
-          keyArgs:
-            ({ args }) => [
-              args[0],
-            ],
+              keyArgs:
+                ({ args }) => [
+                  args[0],
+                ],
 
-          value:
-            ({ result }) =>
-              result,
-        },
-
-        invalidate: [
-          'users',
-          'userByCriteria',
+              value:
+                ({ result }) =>
+                  result,
+            },
+          },
+          {
+            invalidate: {
+              resource: 'users',
+              keyArgs: () => [],
+            },
+          },
         ],
       },
 
       delete: {
-        invalidate: [
-          'userById',
-          'userByCriteria',
-          'users',
+        effects: [
+          {
+            invalidate: {
+              resource: 'userById',
+              keyArgs: ({ args }) => [args[0]],
+            },
+          },
+          {
+            invalidate: {
+              resource: 'users',
+              keyArgs: () => [],
+            },
+          },
         ],
       },
     },
   });
 ```
+
+This complete MVP example intentionally does not cache `matching(criteria)`: the shown
+mutations do not carry enough information to derive every affected criteria key exactly.
+Caching that query requires domain-specific exact derivation, acceptance of TTL-bounded
+staleness, or a post-MVP indexed invalidation mechanism.
 
 Application cache module:
 
@@ -2270,7 +2334,7 @@ export const userSearcherCache =
     resources: {
       searchResult: {
         version: 1,
-        ttl: '2m',
+        ttl: 120_000,
 
         key: ([criteria]) => ({
           tenantId:
@@ -2387,27 +2451,27 @@ The MVP should include:
 3. `CacheProxyModule.forRoot`
 4. `CacheProxyModule.forFeature`
 5. `useClass` provider wrapping
-6. ideally `useExisting`
-7. JavaScript runtime proxy
-8. strongly typed provider methods
-9. explicit resources
-10. cache-aside
-11. passthrough methods
-12. TTL
-13. deterministic keys
-14. structured key input
-15. namespaces
-16. resource versions
-17. invalidation
-18. write-through
-19. `CACHE_MANAGER` integration
-20. memory compatibility
-21. Redis/Keyv compatibility
-22. null/miss distinction
-23. fail-open cache errors
-24. cache contract testing
-25. configuration validation
-26. centralized cache-module support
+6. JavaScript runtime proxy for `Promise<T>` methods
+7. strongly typed provider methods
+8. explicit resources
+9. cache-aside
+10. passthrough methods
+11. TTL in milliseconds
+12. deterministic keys
+13. structured key input
+14. namespaces
+15. resource versions
+16. exact-key invalidation
+17. write-through
+18. `CACHE_MANAGER` integration
+19. memory compatibility
+20. one verified Redis/Keyv configuration
+21. null/miss distinction through an internal value envelope
+22. fail-open cache errors and a minimal error hook
+23. cache contract testing
+24. configuration validation
+25. centralized cache-module support
+26. singleton `useClass` providers and runtime NestJS tokens
 
 ---
 
@@ -2415,6 +2479,7 @@ The MVP should include:
 
 High-value next features:
 
+* `useExisting`
 * negative caching
 * request coalescing
 * TTL jitter
@@ -2556,6 +2621,11 @@ Applications should be able to configure caching entirely from NestJS modules or
 
 # Initial implementation plan
 
+The maintained implementation plan is split into reviewable, evidence-driven documents
+under [`docs/iterations`](iterations/README.md). The phases below are a conceptual summary;
+the iteration documents define scope, dependencies, acceptance criteria, and completion
+evidence.
+
 ## Phase 1 — Public API
 
 Define:
@@ -2615,6 +2685,9 @@ factory provider
 
 Verify transparent injection.
 
+The initial implementation is limited to singleton `useClass` providers and runtime
+NestJS tokens.
+
 ---
 
 ## Phase 4 — Dynamic modules
@@ -2651,7 +2724,7 @@ Implement:
 
 Implement:
 
-* invalidation
+* exact-key invalidation
 * multiple invalidations
 * write-through
 
