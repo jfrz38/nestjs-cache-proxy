@@ -13,17 +13,39 @@ validation that policies and tests can inspect without accessing cache internals
 
 ## Architectural decisions
 
-- Final keys contain configured namespace, resource name, resource version, and canonical
-  structured input using an unambiguous format.
+- Final keys use `ncp:k1:` followed by a fixed-order JSON payload containing namespace,
+  resource name, resource version, and canonical structured input.
 - MVP structured values are JSON-like primitives, arrays, and plain string-keyed objects;
   finite numbers only. Object keys are sorted recursively.
-- `undefined`, functions, symbols, `BigInt`, `Date`, `Map`, `Set`, class instances, sparse
-  arrays, non-finite numbers, and cyclic values are rejected.
+- `undefined`, functions, symbols and symbol properties, `BigInt`, `Date`, `Map`, `Set`, class
+  instances, accessors, non-enumerable properties, sparse arrays, non-finite numbers, and
+  cyclic values are rejected. Objects with `Object.prototype` or `null` prototype are allowed.
 - Delimiters and type identity are encoded so concatenation cannot create collisions.
 - TTL is a positive safe integer in milliseconds. `0`, negative, fractional, `NaN`, and
   infinite values are invalid.
 - Raw keys are not included in default logs/errors. Hashing sensitive components remains
   future work; users must avoid placing secrets in key input.
+- Namespace components and resource names are non-empty strings without Unicode normalization.
+  Their literal values remain distinct identities.
+- Validation errors extend `CacheKeyValidationError`; namespace, resource, version, and input
+  failures each expose a stable specialized error class and code without raw key input.
+
+## Frozen `k1` format
+
+`buildCacheKey` accepts `{ namespace: { application, environment }, resource, version, input }`.
+All strings must be non-empty after trimming; `version` is a positive safe integer. The output
+is exactly the `ncp:k1:` prefix plus this fixed-order JSON form:
+
+```text
+{"input":<tagged-input>,"namespace":{"application":"...","environment":"..."},"resource":"...","version":1}
+```
+
+Tagged input values use `{"t":"null"}`, `{"t":"boolean","v":true}`,
+`{"t":"string","v":"..."}`, `{"t":"number","v":"..."}`,
+`{"t":"array","v":[...]}`, and `{"t":"object","v":[[key,value],...]}`. Numbers are
+canonical strings and preserve `-0`; object entries sort by UTF-16 code-unit order. The exact
+field order and tags are part of format `k1`. A representation change needs a new format prefix;
+a resource-version bump isolates changed resource semantics but does not migrate or delete data.
 
 ## Functional scope
 
@@ -36,7 +58,7 @@ validation that policies and tests can inspect without accessing cache internals
 
 - Runtime guards for the existing public `StructuredKeyInput` type.
 - Canonical encoder with documented format/version.
-- Namespace normalization and final-key composition.
+- Fixed namespace validation and final-key composition.
 - Contract fixtures for ordering, escaping, primitive distinctions, and rejection cases.
 
 ## Expected files and components
@@ -44,7 +66,8 @@ validation that policies and tests can inspect without accessing cache internals
 - `src/key/structured-key.types.ts` (introduced in iteration 02; extended only if needed)
 - `src/key/canonicalize-key.ts`
 - `src/key/build-cache-key.ts`
-- `src/key/validate-key-input.ts`
+- `src/key/cache-key-validation-error.ts`
+- `src/key/encode-structured-key-input.ts`
 - `src/policy/validate-ttl.ts`
 - key contract fixtures and tests
 
@@ -53,7 +76,7 @@ validation that policies and tests can inspect without accessing cache internals
 1. Specify the accepted value grammar and final-key format before coding.
 2. Implement canonical encoding recursively with cycle and plain-object checks.
 3. Compose namespace, resource, and version without delimiter ambiguity.
-4. Validate namespace/resource constraints and TTL.
+4. Validate namespace/resource constraints and centralize TTL validation.
 5. Add public pure helpers needed for policy contract tests.
 6. Create frozen fixtures that make format changes deliberate.
 7. Verify tenant examples and redaction behavior.
@@ -63,8 +86,9 @@ validation that policies and tests can inspect without accessing cache internals
 - Compile-time tests for accepted and rejected `StructuredKeyInput` shapes.
 - Unit property/table tests for object order, arrays, escaping, primitive distinctions,
   cycles, unsupported instances, and TTL boundaries.
-- Contract fixtures asserting exact output for representative keys.
+- Frozen exact-output fixtures for representative keys.
 - Collision corpus proving known ambiguous concatenations remain distinct.
+- Runtime tests for specialized validation-error hierarchy, names, codes, and redaction.
 
 ## Acceptance criteria
 
@@ -74,6 +98,8 @@ validation that policies and tests can inspect without accessing cache internals
 - Namespace and version changes isolate entries predictably.
 - A version bump is documented as isolation, not migration or cleanup.
 - Tests demonstrate tenant identity inclusion for tenant-scoped data.
+- Consumers can distinguish namespace, resource, version, and input validation failures through
+  specialized errors while handling their shared base class.
 
 ## Definition of Done
 
@@ -102,12 +128,13 @@ explain whether it requires a resource version bump.
 
 ## Documentation updates
 
-Publish the accepted value table, exact format stability rules, TTL units, multi-tenant
-guidance, sensitive-data warning, and version-bump checklist.
+Publish the accepted value table, exact format stability rules, validation-error hierarchy, TTL
+units, multi-tenant guidance, sensitive-data warning, and version-bump checklist.
 
 ## Exit evidence
 
-- Canonical format specification
-- Frozen key fixture output
-- Collision and rejection test report
-- Reviewed tenant-isolation example
+- `pnpm run typecheck` validates public key input types and policy typing.
+- `pnpm run test` covers frozen `k1` output, collision pairs, rejection cases, TTL boundaries,
+  namespace/resource/version isolation, and package exports.
+- The root README documents tenant identity, sensitive-input guidance, format stability, and
+  version-bump behavior.

@@ -27,9 +27,37 @@ const userCachePolicy = defineCachePolicy<UserRepository>()({
 ```
 
 Only Promise-returning methods may be configured. Read rules use `cache`; mutations use a
-non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effects. Keys use
-`StructuredKeyInput`: JSON-like primitives, arrays, and string-keyed objects. Deterministic
-key encoding and runtime key-value validation arrive in iteration 03.
+non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effects.
+
+## Cache Keys
+
+`buildCacheKey` exposes the deterministic `k1` contract used by later runtime iterations:
+
+```ts
+const key = buildCacheKey({
+  namespace: { application: 'users-api', environment: 'production' },
+  resource: 'userById',
+  version: 1,
+  input: { tenantId: 'tenant-1', id: 'user-1' },
+});
+```
+
+The resulting key starts with `ncp:k1:` followed by tagged canonical JSON. It distinguishes
+types such as `1` and `'1'`, preserves `-0`, recursively orders object keys, and encodes
+delimiters safely. The `input` accepts only `null`, booleans, finite numbers, strings, dense
+arrays, and plain string-keyed objects. It rejects cycles, accessors, sparse arrays, class
+instances, collections, symbols, functions, `BigInt`, and non-finite numbers.
+
+Validation failures extend `CacheKeyValidationError`. Consumers that need to handle a specific
+rule can use `InvalidCacheKeyNamespaceError`, `InvalidCacheKeyResourceError`,
+`InvalidCacheKeyVersionError`, or `InvalidCacheKeyInputError`; each has a stable `code` and
+does not include raw key input in its message.
+
+Include tenant identity in `input` whenever data is tenant-scoped. Do not include secrets,
+credentials, tokens, or other sensitive values: keys can be visible to cache infrastructure.
+Resource versions isolate incompatible entries; a version bump neither migrates nor deletes
+older entries. The `k1` payload is a persistent contract, so future representation changes
+must introduce a new format version.
 
 ## Requirements
 

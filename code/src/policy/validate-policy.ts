@@ -1,3 +1,5 @@
+import { isValidTtl } from './validate-ttl.js';
+
 const resourceFields = new Set(['key', 'method', 'ttl', 'version']);
 const cacheRuleFields = new Set(['cache']);
 const mutationRuleFields = new Set(['effects']);
@@ -58,13 +60,13 @@ function validateResource(name: string, resource: unknown): void {
     throw invalid(`Resource "${name}" must declare a method name.`);
   }
 
-  if (!isPositiveSafeInteger(resource.ttl)) {
+  if (!isValidTtl(resource.ttl)) {
     throw invalid(
       `Resource "${name}" must declare a positive integer TTL in milliseconds.`,
     );
   }
 
-  if (!isPositiveSafeInteger(resource.version)) {
+  if (!isValidTtl(resource.version)) {
     throw invalid(
       `Resource "${name}" must declare a positive integer version.`,
     );
@@ -172,10 +174,6 @@ function hasOnlyFields(
   allowed: ReadonlySet<string>,
 ): boolean {
   return Object.keys(value).every((field) => allowed.has(field));
-}
-
-function isPositiveSafeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
