@@ -12,10 +12,7 @@ type TaggedKeyValue =
     }
   | { readonly t: 'string'; readonly v: string };
 
-/**
- * Validates and encodes a structured key value as an unambiguous tagged representation.
- * The traversal uses property descriptors so validation never executes input accessors.
- */
+/** Uses property descriptors so validation never executes input accessors. */
 export function encodeStructuredKeyInput(
   input: StructuredKeyInput,
 ): TaggedKeyValue {

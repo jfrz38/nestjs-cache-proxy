@@ -7,10 +7,8 @@ export {
   InvalidCacheKeyResourceError,
   InvalidCacheKeyVersionError,
 } from './key/cache-key-validation-error.js';
-export {
-  InvalidCachePolicyError,
-  validateCachePolicy,
-} from './policy/validate-policy.js';
+export { InvalidCachePolicyError } from './policy/invalid-cache-policy-error.js';
+export { validateCachePolicy } from './policy/validate-policy.js';
 export type { StructuredKeyInput } from './key/structured-key.types.js';
 export type {
   BuildCacheKeyInput,

@@ -2,8 +2,8 @@
 
 Transparent, declarative caching for NestJS providers using DI, proxies, and cache-manager.
 
-The typed cache-policy API is available. Runtime caching and NestJS provider integration are
-implemented in later iterations.
+The typed cache-policy API and framework-independent runtime cache-aside proxy are available.
+NestJS provider integration is implemented in a later iteration.
 
 ## Typed Policies
 
@@ -28,6 +28,27 @@ const userCachePolicy = defineCachePolicy<UserRepository>()({
 
 Only Promise-returning methods may be configured. Read rules use `cache`; mutations use a
 non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effects.
+
+## Runtime Cache-Aside
+
+The internal runtime compiles each policy into immutable read rules and validated value objects for
+the namespace, resource, key version, TTL, and deterministic cache key. The public policy API
+remains a plain object with numeric `version` and `ttl` fields. A configured read builds its key,
+reads the cache, invokes the provider on a miss, awaits a best-effort write, and returns the
+provider result. Cache get and set failures fail open; provider errors propagate unchanged.
+
+The proxy preserves provider `this` binding, including ECMAScript private fields, and passes
+through properties, symbols, accessors, unconfigured methods, and mutation rules. Wrapper identity
+is stable per string-named method, but the proxy is not guaranteed to satisfy `instanceof` the
+concrete provider class. Concurrent misses are independent; request coalescing is not included.
+
+The runtime is composed from `CachePolicyCompiler`, `CacheAsideExecutor`, and
+`CacheProxyFactory`. These framework-independent classes and their value objects are internal;
+NestJS will compose them with a concrete cache adapter in a later iteration.
+
+Until the value envelope arrives in the next resilience iteration, `null` and `undefined` from a
+cache store are misses. Provider `null` and `undefined` results are returned but not stored; other
+falsy values such as `false`, `0`, and `''` are cacheable.
 
 ## Cache Keys
 
