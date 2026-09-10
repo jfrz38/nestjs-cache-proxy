@@ -36,6 +36,10 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 - Validation of empty namespace, duplicate feature token, and absent cache manager.
 - Explicit import-order and global-module behavior; avoid making the module global unless
   a concrete need is demonstrated.
+- Establish the library layer mapping and enable
+  `@jfrz38/eslint-plugin-clean-architecture-highlighter` as a local and CI lint gate.
+- Enforce `nest -> runtime -> key / policy`; reject NestJS or backend imports from the core and
+  prevent internal ports and tokens from becoming public API.
 
 ## Expected files and components
 
@@ -54,6 +58,8 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 5. Test feature modules imported through an application cache module.
 6. Test multiple independent cached providers and resource names.
 7. Document root/feature placement, import visibility, and duplicate semantics.
+8. Record the layer aliases and allowed dependencies, then enable the architecture lint rule
+   for the documented dependency direction.
 
 ## Tests
 
@@ -62,6 +68,9 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 - Tests proving internal tokens cannot be imported as public API.
 - Bootstrap failure tests for missing `CACHE_MANAGER`, invalid options, and local duplicate
   registrations.
+- Architecture-rule tests proving prohibited cross-layer imports fail linting.
+- Architecture-rule tests proving NestJS/backend imports from `runtime`, `key`, or `policy`
+  fail linting.
 
 ## Acceptance criteria
 
@@ -71,6 +80,7 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 - A documented centralized module works without provider/consumer cache awareness.
 - Invalid composition fails at bootstrap rather than on the first method call where
   technically possible.
+- Local linting and CI reject imports that violate the documented layer mapping.
 
 ## Definition of Done
 
