@@ -2,7 +2,34 @@
 
 Transparent, declarative caching for NestJS providers using DI, proxies, and cache-manager.
 
-The project foundation is implemented. The public cache-policy API is not available yet.
+The typed cache-policy API is available. Runtime caching and NestJS provider integration are
+implemented in later iterations.
+
+## Typed Policies
+
+Policies are plain, inline objects. A resource declares the Promise-returning method that
+defines its key arguments and cached result contract:
+
+```ts
+const userCachePolicy = defineCachePolicy<UserRepository>()({
+  resources: {
+    userById: {
+      method: 'findById',
+      version: 1,
+      ttl: 300_000,
+      key: ([id]) => id,
+    },
+  },
+  methods: {
+    findById: { cache: 'userById' },
+  },
+});
+```
+
+Only Promise-returning methods may be configured. Read rules use `cache`; mutations use a
+non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effects. Keys use
+`StructuredKeyInput`: JSON-like primitives, arrays, and string-keyed objects. Deterministic
+key encoding and runtime key-value validation arrive in iteration 03.
 
 ## Requirements
 
