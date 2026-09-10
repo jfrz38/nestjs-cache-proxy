@@ -1,6 +1,5 @@
 import { InvalidCacheKeyResourceError } from './cache-key-validation-error.js';
 
-/** Validated resource component of a deterministic cache key. */
 export class CacheResourceName {
   private constructor(public readonly value: string) {}
 

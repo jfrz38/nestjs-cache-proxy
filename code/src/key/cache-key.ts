@@ -4,10 +4,9 @@ import { CacheKeyVersion } from './cache-key-version.js';
 import { CacheNamespace } from './cache-namespace.js';
 import { CacheResourceName } from './cache-resource-name.js';
 
-const formatPrefix = 'ncp:k1:';
-
-/** Deterministic, versioned key accepted by the internal cache-store port. */
 export class CacheKey {
+  private static readonly formatPrefix = 'ncp:k1:';
+
   private constructor(public readonly value: string) {}
 
   public static create({
@@ -17,7 +16,7 @@ export class CacheKey {
     version,
   }: CreateCacheKeyInput): CacheKey {
     return new CacheKey(
-      `${formatPrefix}{"input":${canonicalizeKey(input)},"namespace":{"application":${JSON.stringify(namespace.application)},"environment":${JSON.stringify(namespace.environment)}},"resource":${JSON.stringify(resource.value)},"version":${version.value}}`,
+      `${CacheKey.formatPrefix}{"input":${canonicalizeKey(input)},"namespace":{"application":${JSON.stringify(namespace.application)},"environment":${JSON.stringify(namespace.environment)}},"resource":${JSON.stringify(resource.value)},"version":${version.value}}`,
     );
   }
 }

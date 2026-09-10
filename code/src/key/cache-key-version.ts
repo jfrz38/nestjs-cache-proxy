@@ -1,6 +1,5 @@
 import { InvalidCacheKeyVersionError } from './cache-key-validation-error.js';
 
-/** Validated version used to isolate incompatible cache-key representations. */
 export class CacheKeyVersion {
   private constructor(public readonly value: number) {}
 

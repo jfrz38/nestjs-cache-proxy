@@ -1,4 +1,5 @@
 import { CacheKeyVersion } from '../key/cache-key-version.js';
+import { InvalidCachePolicyError } from './invalid-cache-policy-error.js';
 import { TimeToLive } from './time-to-live.js';
 
 const resourceFields = new Set(['key', 'method', 'ttl', 'version']);
@@ -8,14 +9,6 @@ const invalidateFields = new Set(['invalidate']);
 const writeThroughFields = new Set(['writeThrough']);
 const invalidateDefinitionFields = new Set(['keyArgs', 'resource']);
 const writeThroughDefinitionFields = new Set(['keyArgs', 'resource', 'value']);
-
-/** Raised when a cache policy cannot be interpreted safely. */
-export class InvalidCachePolicyError extends Error {
-  public constructor(message: string) {
-    super(message);
-    this.name = 'InvalidCachePolicyError';
-  }
-}
 
 /**
  * Validates only structure available at policy-definition time. Provider method shapes are

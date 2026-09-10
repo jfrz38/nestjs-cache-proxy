@@ -1,7 +1,6 @@
-import type { CompiledCachePolicy } from './compiled-policy.types.js';
+import type { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CacheAsideExecutor } from './execute-cache-aside.js';
 
-/** Creates a transparent proxy around configured asynchronous provider methods. */
 export class CacheProxyFactory {
   public constructor(private readonly executor: CacheAsideExecutor) {}
 

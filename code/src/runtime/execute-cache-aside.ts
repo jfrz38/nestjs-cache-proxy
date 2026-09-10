@@ -1,8 +1,7 @@
 import { CacheNamespace } from '../key/cache-namespace.js';
 import type { CacheStore } from './cache-store.port.js';
-import type { CompiledReadRule } from './compiled-policy.types.js';
+import type { CompiledReadRule } from './compiled-read-rule.js';
 
-/** Executes one read rule while treating cache failures as misses. */
 export class CacheAsideExecutor {
   public constructor(
     private readonly cache: CacheStore,

@@ -3,10 +3,8 @@ import { CacheKeyVersion } from '../key/cache-key-version.js';
 import { CacheResourceName } from '../key/cache-resource-name.js';
 import { TimeToLive } from '../policy/time-to-live.js';
 import { validateCachePolicy } from '../policy/validate-policy.js';
-import {
-  CompiledCachePolicy,
-  CompiledReadRule,
-} from './compiled-policy.types.js';
+import { CompiledCachePolicy } from './compiled-cache-policy.js';
+import { CompiledReadRule } from './compiled-read-rule.js';
 
 interface RuntimePolicy {
   readonly resources: Record<string, RuntimeResource>;
@@ -23,7 +21,6 @@ interface RuntimeMethodRule {
   readonly cache?: string;
 }
 
-/** Compiles public policy objects into immutable runtime rules. */
 export class CachePolicyCompiler {
   public compile(policy: unknown): CompiledCachePolicy {
     validateCachePolicy(policy);

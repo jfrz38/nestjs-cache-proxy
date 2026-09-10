@@ -5,9 +5,6 @@ export type RuntimeToken<T> =
 
 export type UseClass<T> = abstract new (...args: never[]) => T;
 
-/**
- * Registration data consumed by the NestJS integration in iteration 05.
- */
 export interface CachedProvider<T> {
   readonly provide: RuntimeToken<T>;
   readonly useClass: UseClass<T>;

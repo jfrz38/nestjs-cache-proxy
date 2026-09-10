@@ -1,7 +1,6 @@
 import type { CacheKeyNamespace } from './cache-key.types.js';
 import { InvalidCacheKeyNamespaceError } from './cache-key-validation-error.js';
 
-/** Validated application and environment components of a cache-key namespace. */
 export class CacheNamespace {
   private constructor(
     public readonly application: string,
@@ -15,20 +14,20 @@ export class CacheNamespace {
       );
     }
 
-    validateComponent(input.application, 'application');
-    validateComponent(input.environment, 'environment');
+    CacheNamespace.validateComponent(input.application, 'application');
+    CacheNamespace.validateComponent(input.environment, 'environment');
 
     return new CacheNamespace(input.application, input.environment);
   }
-}
 
-function validateComponent(
-  value: unknown,
-  name: string,
-): asserts value is string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new InvalidCacheKeyNamespaceError(
-      `Cache key ${name} must be a non-empty string.`,
-    );
+  private static validateComponent(
+    value: unknown,
+    name: string,
+  ): asserts value is string {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new InvalidCacheKeyNamespaceError(
+        `Cache key ${name} must be a non-empty string.`,
+      );
+    }
   }
 }
