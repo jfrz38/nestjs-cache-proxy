@@ -34,14 +34,14 @@ validation that policies and tests can inspect without accessing cache internals
 
 ## Technical scope
 
-- `StructuredKeyInput` public type and matching runtime guards.
+- Runtime guards for the existing public `StructuredKeyInput` type.
 - Canonical encoder with documented format/version.
 - Namespace normalization and final-key composition.
 - Contract fixtures for ordering, escaping, primitive distinctions, and rejection cases.
 
 ## Expected files and components
 
-- `src/key/structured-key.types.ts`
+- `src/key/structured-key.types.ts` (introduced in iteration 02; extended only if needed)
 - `src/key/canonicalize-key.ts`
 - `src/key/build-cache-key.ts`
 - `src/key/validate-key-input.ts`

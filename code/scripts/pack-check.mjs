@@ -117,7 +117,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import { packageVersion } from 'nestjs-cache-proxy'; if (packageVersion !== '0.0.0') process.exit(1);",
+      "import { defineCachePolicy } from 'nestjs-cache-proxy'; if (typeof defineCachePolicy !== 'function') process.exit(1);",
     ],
     esmDirectory,
   );
@@ -125,14 +125,14 @@ try {
     node,
     [
       '--eval',
-      "const { packageVersion } = require('nestjs-cache-proxy'); if (packageVersion !== '0.0.0') process.exit(1);",
+      "const { defineCachePolicy } = require('nestjs-cache-proxy'); if (typeof defineCachePolicy !== 'function') process.exit(1);",
     ],
     cjsDirectory,
   );
 
   await writeFile(
     join(esmDirectory, 'index.ts'),
-    "import { packageVersion } from 'nestjs-cache-proxy';\nconst version: string = packageVersion;\nvoid version;\n",
+    "import { defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\nvoid policy;\n",
   );
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(
