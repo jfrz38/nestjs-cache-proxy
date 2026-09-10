@@ -18,8 +18,8 @@ contract over features that depend on cache-store internals.
 | Iteration                                  | Status   | Outcome                                                        |
 | ------------------------------------------ | -------- | -------------------------------------------------------------- |
 | [00](00-scope-and-decisions.md)            | Complete | Freeze the MVP contract and decision boundaries.               |
-| [01](01-project-foundation.md)             | Active   | Establish the package, toolchain, CI, and distributable build. |
-| [02](02-typed-policy-api.md)               | Planned  | Define the public, strongly typed policy API.                  |
+| [01](01-project-foundation.md)             | Complete | Establish the package, toolchain, CI, and distributable build. |
+| [02](02-typed-policy-api.md)               | Complete | Define the public, strongly typed policy API.                  |
 | [03](03-cache-key-contracts.md)            | Planned  | Make keys and TTL deterministic, safe contracts.               |
 | [04](04-runtime-cache-aside-proxy.md)      | Planned  | Implement the framework-independent cache-aside proxy.         |
 | [05](05-nestjs-provider-integration.md)    | Planned  | Register singleton `useClass` providers transparently.         |

@@ -810,7 +810,7 @@ Example:
 
 ```ts
 export const userCachePolicy =
-  defineCachePolicy<UserRepository>({
+  defineCachePolicy<UserRepository>()({
     resources: {
       // ...
     },
@@ -845,9 +845,10 @@ Example:
 
 ```ts
 export const userCachePolicy =
-  defineCachePolicy<UserRepository>({
+  defineCachePolicy<UserRepository>()({
     resources: {
       userByCriteria: {
+        method: 'matching',
         version: 1,
         ttl: 300_000,
 
