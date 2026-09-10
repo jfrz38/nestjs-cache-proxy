@@ -1,4 +1,5 @@
-import { isValidTtl } from './validate-ttl.js';
+import { CacheKeyVersion } from '../key/cache-key-version.js';
+import { TimeToLive } from './time-to-live.js';
 
 const resourceFields = new Set(['key', 'method', 'ttl', 'version']);
 const cacheRuleFields = new Set(['cache']);
@@ -60,13 +61,17 @@ function validateResource(name: string, resource: unknown): void {
     throw invalid(`Resource "${name}" must declare a method name.`);
   }
 
-  if (!isValidTtl(resource.ttl)) {
+  try {
+    TimeToLive.fromMilliseconds(resource.ttl);
+  } catch {
     throw invalid(
       `Resource "${name}" must declare a positive integer TTL in milliseconds.`,
     );
   }
 
-  if (!isValidTtl(resource.version)) {
+  try {
+    CacheKeyVersion.from(resource.version);
+  } catch {
     throw invalid(
       `Resource "${name}" must declare a positive integer version.`,
     );
