@@ -16,15 +16,22 @@ configured Promise methods and faithfully passes through all other behavior.
   operations, not NestJS decorators or module metadata.
 - Runtime receives that port and its compiled policy through explicit factory arguments; it does
   not introduce a second dependency-injection container.
-- Stateless key and policy transformations remain pure functions. Runtime classes are allowed
-  only when they need to own state, lifecycle, or injected collaborators.
+- Public key and policy facades remain pure functions. The runtime compiles their primitive input
+  into immutable internal Value Objects for namespace, resource name, key version, TTL, and key;
+  runtime classes own their collaborators and behavior without becoming public API.
 - A configured call performs key build, cache get, provider call on miss, best-effort set,
   and returns the provider result.
+- The runtime cache port is private and has only asynchronous `get(key)` and
+  `set(key, value, ttl)` operations. The namespace is an explicit factory dependency.
 - Provider method invocation uses `Reflect.apply(method, target, args)` so `this` and
   ECMAScript private fields remain valid.
 - Rejected promises and synchronous throws from providers propagate unchanged and are
   never cached.
 - `undefined` results are returned but not cached.
+- Until iteration 08 introduces the stored-value envelope, cache `null` and `undefined` are
+  misses. Provider `null` results are returned but not cached; `false`, `0`, and empty strings
+  remain cacheable.
+- Cache writes are awaited to preserve operation order; cache get and set failures are fail-open.
 - Concurrent misses are independent; request coalescing is post-MVP.
 - Properties, symbols, getters, and unconfigured methods follow normal proxy forwarding.
 
@@ -38,6 +45,11 @@ configured Promise methods and faithfully passes through all other behavior.
 ## Technical scope
 
 - Runtime policy representation compiled from public policy objects.
+- Read rules compile once into an internal method-to-resource map. Mutation-effect rules remain
+  passthrough until iteration 07.
+- `CachePolicyCompiler`, `CacheAsideExecutor`, and `CacheProxyFactory` compose the runtime;
+  compiled rules and the cache port exchange validated Value Objects rather than raw key strings
+  or TTL numbers.
 - Proxy `get` trap with stable method wrappers where practical.
 - Key builder integration and cache-aside execution path.
 - Temporary value codec boundary completed by iteration 08; tests must not assume raw
@@ -49,11 +61,14 @@ configured Promise methods and faithfully passes through all other behavior.
 - `src/runtime/execute-cache-aside.ts`
 - `src/runtime/cache-store.port.ts`
 - `src/runtime/compiled-policy.types.ts`
+- `src/runtime/compile-cache-policy.ts`
+- internal key namespace, resource, version, key, and TTL Value Objects
 - unit fixtures for providers and cache stores
 
 ## Detailed steps
 
-1. Define the smallest internal cache operations and runtime policy shape.
+1. Define validated internal value objects, the smallest cache operations, and the runtime policy
+   shape.
 2. Pass runtime dependencies explicitly through the proxy factory and keep the cache-store port
    private to the runtime boundary.
 3. Implement transparent property forwarding and method interception.
@@ -61,7 +76,8 @@ configured Promise methods and faithfully passes through all other behavior.
 5. Implement cache hit and miss paths with deterministic keys.
 6. Skip writes for `undefined` and failed provider calls.
 7. Preserve passthrough behavior for symbols, properties, and unsupported method shapes.
-8. Add operation seams for fail-open reporting finalized in iteration 08.
+8. Leave cache-error reporting and value envelopes to iteration 08; do not expose either as a
+   partial public API.
 
 ## Tests
 
@@ -109,10 +125,11 @@ The global Definition of Done applies. Runtime tests run without bootstrapping N
 ## Documentation updates
 
 Document the cache-aside sequence, passthrough guarantees, supported method contract,
-concurrent miss behavior, and concrete-class identity limitation.
+concurrent miss behavior, temporary `null` behavior, and concrete-class identity limitation.
 
 ## Exit evidence
 
-- Framework-independent unit test report
-- Call-order assertions
-- Private-field and passthrough compatibility fixtures
+- `pnpm run typecheck` and `pnpm run test` pass on Node.js 24.18.0.
+- Call-order assertions cover get, provider, set, and repeated hits.
+- Private-field, accessor, symbol, stable-wrapper, passthrough, fail-open, and independent
+  concurrent-miss fixtures pass without NestJS bootstrapping.

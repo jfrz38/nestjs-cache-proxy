@@ -761,6 +761,10 @@ The library follows these mandatory design rules:
 - Use a class when it represents error identity, state, lifecycle, polymorphic behavior, or a
   collaborator that must receive dependencies. A class must have one cohesive responsibility;
   generic `Manager`, `Helper`, and catch-all `Service` classes are not acceptable abstractions.
+- Use an immutable internal Value Object when a primitive has a stable technical meaning and
+  invariant that must survive beyond an input boundary. Cache namespace, resource name, key
+  version, TTL, and the built cache key are examples. Keep the public declarative policy ergonomic:
+  compilation, rather than consumers, constructs internal Value Objects.
 - Introduce a port only when an inner component needs a variable external capability. The port
   belongs to the inner consumer and its implementation stays at the outer boundary.
 - Inject dependencies through constructors or explicit factory arguments. Do not use global
