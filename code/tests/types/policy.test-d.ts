@@ -1,5 +1,7 @@
 import {
+  buildCacheKey,
   defineCachePolicy,
+  type BuildCacheKeyInput,
   type CachedProvider,
   type StructuredKeyInput,
 } from '../../src/index.js';
@@ -65,6 +67,15 @@ const structuredInput: StructuredKeyInput = {
   values: [true, null, 'value'],
 };
 
+const cacheKeyInput: BuildCacheKeyInput = {
+  namespace: { application: 'users-api', environment: 'test' },
+  resource: 'userById',
+  version: 1,
+  input: structuredInput,
+};
+
+const cacheKey = buildCacheKey(cacheKeyInput);
+
 class DefaultUserRepository extends UserRepository {
   public findById(id: string): Promise<User | null> {
     return Promise.resolve({ id, name: 'Ada' });
@@ -97,6 +108,7 @@ const provider: CachedProvider<UserRepository> = {
 
 void provider;
 void structuredInput;
+void cacheKey;
 
 defineCachePolicy<UserRepository>()({
   resources: {
@@ -116,6 +128,9 @@ defineCachePolicy<UserRepository>()({
 // @ts-expect-error A Date is not a structured key input.
 const invalidStructuredInput: StructuredKeyInput = new Date();
 void invalidStructuredInput;
+
+// @ts-expect-error Cache-key input follows the structured-key grammar.
+buildCacheKey({ ...cacheKeyInput, input: new Date() });
 
 defineCachePolicy<UserRepository>()({
   resources: {

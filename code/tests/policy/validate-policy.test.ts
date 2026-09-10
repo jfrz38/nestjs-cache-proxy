@@ -62,6 +62,15 @@ describe('validateCachePolicy', () => {
       },
     ],
     [
+      'a fractional TTL',
+      {
+        ...validPolicy,
+        resources: {
+          userById: { ...validPolicy.resources.userById, ttl: 1.5 },
+        },
+      },
+    ],
+    [
       'an unknown read resource',
       {
         ...validPolicy,

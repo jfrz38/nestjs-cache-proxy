@@ -17,6 +17,10 @@ implementation token and NestJS `CACHE_MANAGER`.
 - Every registration creates a unique internal symbol for the implementation.
 - The public token is provided only by a factory that receives the concrete instance,
   cache manager, global options, and compiled policy.
+- NestJS is the composition root: constructor injection and provider factories assemble outer
+  collaborators, while the runtime core receives only its framework-independent dependencies.
+- `ModuleRef`, NestJS decorators, and NestJS tokens do not cross into `runtime`, `key`, or
+  `policy`.
 - Supported public tokens are classes, abstract classes, strings, and symbols.
 - The implementation class must be singleton-scoped. Request/transient scope is rejected
   before application startup where metadata permits.
@@ -52,7 +56,7 @@ implementation token and NestJS `CACHE_MANAGER`.
 1. Define runtime token and `useClass` constructor types.
 2. Generate a collision-free internal implementation token per registration.
 3. Register `useClass` under that internal token.
-4. Register the public-token factory and create the runtime proxy.
+4. Register the public-token factory and create the runtime proxy from explicit collaborators.
 5. Wire global options and `CACHE_MANAGER` without configuring a backend.
 6. Validate unsupported scopes and malformed or duplicate local registrations.
 7. Verify dependency resolution and provider lifecycle hooks.
@@ -73,6 +77,7 @@ implementation token and NestJS `CACHE_MANAGER`.
 - Registration never injects the public token to construct itself.
 - Unsupported scope/configuration fails during bootstrap with actionable redacted output.
 - All supported token forms behave identically.
+- NestJS composition is the only DI boundary; the core remains framework-free.
 
 ## Definition of Done
 

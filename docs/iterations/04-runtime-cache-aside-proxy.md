@@ -14,6 +14,10 @@ configured Promise methods and faithfully passes through all other behavior.
 
 - The core depends on a minimal internal cache port shaped by required cache-manager
   operations, not NestJS decorators or module metadata.
+- Runtime receives that port and its compiled policy through explicit factory arguments; it does
+  not introduce a second dependency-injection container.
+- Stateless key and policy transformations remain pure functions. Runtime classes are allowed
+  only when they need to own state, lifecycle, or injected collaborators.
 - A configured call performs key build, cache get, provider call on miss, best-effort set,
   and returns the provider result.
 - Provider method invocation uses `Reflect.apply(method, target, args)` so `this` and
@@ -50,12 +54,14 @@ configured Promise methods and faithfully passes through all other behavior.
 ## Detailed steps
 
 1. Define the smallest internal cache operations and runtime policy shape.
-2. Implement transparent property forwarding and method interception.
-3. Compile/cache wrappers without losing target binding.
-4. Implement cache hit and miss paths with deterministic keys.
-5. Skip writes for `undefined` and failed provider calls.
-6. Preserve passthrough behavior for symbols, properties, and unsupported method shapes.
-7. Add operation seams for fail-open reporting finalized in iteration 08.
+2. Pass runtime dependencies explicitly through the proxy factory and keep the cache-store port
+   private to the runtime boundary.
+3. Implement transparent property forwarding and method interception.
+4. Compile/cache wrappers without losing target binding.
+5. Implement cache hit and miss paths with deterministic keys.
+6. Skip writes for `undefined` and failed provider calls.
+7. Preserve passthrough behavior for symbols, properties, and unsupported method shapes.
+8. Add operation seams for fail-open reporting finalized in iteration 08.
 
 ## Tests
 
@@ -73,6 +79,8 @@ configured Promise methods and faithfully passes through all other behavior.
 - Cache failures do not replace the provider result or error.
 - Methods using private fields work through the proxy.
 - Passthrough behavior is observationally equivalent for documented cases.
+- Runtime remains independent of a Nest application context and receives no NestJS container,
+  decorator, or cache-manager type.
 
 ## Definition of Done
 

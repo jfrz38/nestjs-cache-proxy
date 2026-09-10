@@ -20,7 +20,7 @@ contract over features that depend on cache-store internals.
 | [00](00-scope-and-decisions.md)            | Complete | Freeze the MVP contract and decision boundaries.               |
 | [01](01-project-foundation.md)             | Complete | Establish the package, toolchain, CI, and distributable build. |
 | [02](02-typed-policy-api.md)               | Complete | Define the public, strongly typed policy API.                  |
-| [03](03-cache-key-contracts.md)            | Planned  | Make keys and TTL deterministic, safe contracts.               |
+| [03](03-cache-key-contracts.md)            | Complete | Make keys and TTL deterministic, safe contracts.               |
 | [04](04-runtime-cache-aside-proxy.md)      | Planned  | Implement the framework-independent cache-aside proxy.         |
 | [05](05-nestjs-provider-integration.md)    | Planned  | Register singleton `useClass` providers transparently.         |
 | [06](06-dynamic-modules.md)                | Planned  | Compose root and feature dynamic modules.                      |
@@ -66,6 +66,7 @@ An iteration is complete only when:
 | Fail-open cache operations and provider error propagation      | 04, 08              |
 | Minimal safe cache error reporting                             | 08                  |
 | `CACHE_MANAGER` integration and centralized composition        | 05, 06              |
+| Static clean-architecture dependency validation                | 06                  |
 | Contract testing utilities                                     | 03, 09              |
 | Memory and Redis/Keyv compatibility                            | 10                  |
 | NestJS 11/12 and Node 20/22/24 compatibility                   | 01, 10, 11          |
