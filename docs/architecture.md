@@ -761,6 +761,11 @@ The library follows these mandatory design rules:
 - Use a class when it represents error identity, state, lifecycle, polymorphic behavior, or a
   collaborator that must receive dependencies. A class must have one cohesive responsibility;
   generic `Manager`, `Helper`, and catch-all `Service` classes are not acceptable abstractions.
+- Keep behavior that exists solely to support a class inside that class as a private method or
+  member. Keep independent functional operations in class-free modules; split files when a class
+  and a function have distinct responsibilities.
+- Comments explain non-obvious decisions, constraints, or tool metadata. Do not use comments to
+  restate names, types, or control flow that the code already expresses.
 - Use an immutable internal Value Object when a primitive has a stable technical meaning and
   invariant that must survive beyond an input boundary. Cache namespace, resource name, key
   version, TTL, and the built cache key are examples. Keep the public declarative policy ergonomic:

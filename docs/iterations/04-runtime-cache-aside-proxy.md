@@ -19,6 +19,8 @@ configured Promise methods and faithfully passes through all other behavior.
 - Public key and policy facades remain pure functions. The runtime compiles their primitive input
   into immutable internal Value Objects for namespace, resource name, key version, TTL, and key;
   runtime classes own their collaborators and behavior without becoming public API.
+- Class-specific behavior is encapsulated in private members. Independent transformations remain
+  in class-free modules, and compiled runtime classes use one file per class.
 - A configured call performs key build, cache get, provider call on miss, best-effort set,
   and returns the provider result.
 - The runtime cache port is private and has only asynchronous `get(key)` and
@@ -60,15 +62,16 @@ configured Promise methods and faithfully passes through all other behavior.
 - `src/runtime/create-cache-proxy.ts`
 - `src/runtime/execute-cache-aside.ts`
 - `src/runtime/cache-store.port.ts`
-- `src/runtime/compiled-policy.types.ts`
+- `src/runtime/compiled-cache-policy.ts`
+- `src/runtime/compiled-read-rule.ts`
 - `src/runtime/compile-cache-policy.ts`
 - internal key namespace, resource, version, key, and TTL Value Objects
 - unit fixtures for providers and cache stores
 
 ## Detailed steps
 
-1. Define validated internal value objects, the smallest cache operations, and the runtime policy
-   shape.
+1. Define validated internal value objects, the smallest cache operations, and one class per
+   runtime policy responsibility.
 2. Pass runtime dependencies explicitly through the proxy factory and keep the cache-store port
    private to the runtime boundary.
 3. Implement transparent property forwarding and method interception.
