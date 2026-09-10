@@ -7,8 +7,8 @@ A reproducible foundation is required before public API work can be reviewed rel
 
 ## Objective
 
-Create a strict pnpm TypeScript library package that builds declarations and supports
-repeatable lint, typecheck, test, package, and compatibility workflows.
+Create a strict pnpm TypeScript library package in `code/` that builds declarations and
+supports repeatable lint, typecheck, test, package, and compatibility workflows.
 
 ## Architectural decisions
 
@@ -21,6 +21,8 @@ repeatable lint, typecheck, test, package, and compatibility workflows.
   applicable latest Node 20, 22, and 24 releases.
 - Dependency ranges are based on combinations actually tested, not current registry
   versions alone.
+- The root `README.md` and `LICENSE` remain the documentation sources of truth. `prepack`
+  copies them temporarily into `code/` so the published tarball includes both files.
 
 ## Functional scope
 
@@ -30,7 +32,7 @@ installation, validation, build, and package inspection.
 ## Technical scope
 
 - Initialize package metadata, pnpm lockfile, strict TypeScript configuration, and source
-  entry point.
+  entry point inside `code/`.
 - Configure ESM/CommonJS output, source maps, and declarations without duplicate runtime
   dependency bundles.
 - Configure Vitest, ESLint, Prettier, and Markdown linting.
@@ -38,24 +40,32 @@ installation, validation, build, and package inspection.
 
 ## Expected files and components
 
-- `package.json`, `pnpm-lock.yaml`, `tsconfig*.json`
-- build, lint, formatting, and Vitest configuration
-- `src/index.ts`
-- `test/` or colocated test conventions
+- `code/package.json`, `code/pnpm-lock.yaml`, `code/tsconfig*.json`
+- `code/` build, lint, formatting, and Vitest configuration
+- `code/src/index.ts`
+- `code/tests/`
 - `.github/workflows/ci.yml`
-- package-content allowlist and ignore files
+- root `Makefile`, `.editorconfig`, `.gitignore`, and package-content allowlist
 
 ## Detailed steps
 
-1. Initialize pnpm metadata, license, repository fields, engines, and package side effects.
-2. Select a build tool only after proving dual-format declarations and sourcemaps.
-3. Define `lint`, `format:check`, `typecheck`, `test`, `test:coverage`, `build`, and
+1. Create `feature/project-foundation` from `develop` before changing files.
+2. Initialize pnpm metadata, repository fields, engines, and package side effects in `code/`.
+3. Use TypeScript 6.0.3 and tsup 8.5.1, which support the Node 20.19 baseline and produce
+   dual-format output, declarations, and sourcemaps.
+4. Add an explicit pnpm build-script allowlist for `esbuild`; do not enable dependency
+   lifecycle scripts globally.
+5. Define `lint`, `format:check`, `typecheck`, `test`, `test:coverage`, `build`, and
    `pack:check` scripts.
-4. Add strict compiler settings and separate build/type-test configurations as needed.
-5. Declare peer and development dependency ranges for the first tested combination.
-6. Add a minimal exported version or placeholder that exercises the package entry points.
-7. Add CI with Node runtime jobs and dependency-compatibility jobs kept distinct.
-8. Pack the tarball and import/require it from isolated smoke fixtures.
+6. Add strict compiler settings and separate build/type-test configurations as needed.
+7. Declare peer and development dependency ranges for the tested NestJS 11 and 12
+   combinations.
+8. Add a minimal exported placeholder that exercises the package entry points without
+   preempting the public policy API planned for iteration 02.
+9. Add CI with Node runtime jobs and dependency-compatibility jobs kept distinct.
+10. Pack the tarball and import, require, and type-check it from isolated smoke fixtures.
+11. Expose all contributor commands through the root Makefile and add weekly Dependabot
+    updates for pnpm and GitHub Actions.
 
 ## Tests
 
