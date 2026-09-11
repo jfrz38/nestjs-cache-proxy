@@ -9,12 +9,15 @@ export {
 } from './key/cache-key-validation-error.js';
 export { InvalidCachePolicyError } from './policy/invalid-cache-policy-error.js';
 export { validateCachePolicy } from './policy/validate-policy.js';
+export { cachedProvider } from './nest/cached-provider.js';
+export { InvalidCachedProviderError } from './nest/invalid-cached-provider-error.js';
 export type { StructuredKeyInput } from './key/structured-key.types.js';
 export type {
   BuildCacheKeyInput,
   CacheKeyNamespace,
 } from './key/cache-key.types.js';
 export type { CacheKeyValidationCode } from './key/cache-key-validation-error.js';
+export type { CacheProxyOptions } from './nest/cache-proxy-options.js';
 export type {
   CacheEffect,
   CachePolicy,
