@@ -65,9 +65,21 @@ jobs:
       matrix:
         include:
           - nestjs: 11
+            nestjs_version: 11.0.0
+            nestjs_cache_manager_version: 3.0.0
+            cache_manager_version: 6.0.0
+          - nestjs: 11
             nestjs_version: 11.2.3
             nestjs_cache_manager_version: 3.1.3
             cache_manager_version: 6.4.3
+          - nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - nestjs: 12
+            nestjs_version: 12.0.0
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 6.0.0
           - nestjs: 12
             nestjs_version: 12.0.1
             nestjs_cache_manager_version: 12.0.0

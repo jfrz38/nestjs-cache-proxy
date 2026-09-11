@@ -9,14 +9,6 @@ updates:
     groups:
       npm-development:
         dependency-type: development
-      npm-peer-dependencies:
-        patterns:
-          - "@nestjs/cache-manager"
-          - "@nestjs/common"
-          - "@nestjs/core"
-          - "cache-manager"
-          - "reflect-metadata"
-          - "rxjs"
   - package-ecosystem: github-actions
     directory: /
     schedule:
