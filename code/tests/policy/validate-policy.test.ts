@@ -37,6 +37,7 @@ describe('validateCachePolicy', () => {
     [
       'an empty resource name',
       { ...validPolicy, resources: { '': validPolicy.resources.userById } },
+      'Resource names must not be empty.',
     ],
     [
       'a non-positive TTL',
@@ -46,6 +47,7 @@ describe('validateCachePolicy', () => {
           userById: { ...validPolicy.resources.userById, ttl: 0 },
         },
       },
+      'Resource "userById" must declare a positive integer TTL in milliseconds.',
     ],
     [
       'an unsafe version',
@@ -58,6 +60,7 @@ describe('validateCachePolicy', () => {
           },
         },
       },
+      'Resource "userById" must declare a positive integer version.',
     ],
     [
       'a fractional TTL',
@@ -67,6 +70,7 @@ describe('validateCachePolicy', () => {
           userById: { ...validPolicy.resources.userById, ttl: 1.5 },
         },
       },
+      'Resource "userById" must declare a positive integer TTL in milliseconds.',
     ],
     [
       'an unknown read resource',
@@ -74,6 +78,7 @@ describe('validateCachePolicy', () => {
         ...validPolicy,
         methods: { findById: { cache: 'missing' } },
       },
+      'Method "findById" references an unknown or invalid resource.',
     ],
     [
       'a rule with cache and effects',
@@ -81,6 +86,7 @@ describe('validateCachePolicy', () => {
         ...validPolicy,
         methods: { findById: { cache: 'userById', effects: [] } },
       },
+      'Method "findById" must declare either cache or effects.',
     ],
     [
       'an empty effects list',
@@ -88,6 +94,7 @@ describe('validateCachePolicy', () => {
         ...validPolicy,
         methods: { update: { effects: [] } },
       },
+      'Method "update" must declare at least one effect.',
     ],
     [
       'an effect with both discriminants',
@@ -111,10 +118,16 @@ describe('validateCachePolicy', () => {
           },
         },
       },
+      'Method "update" effects must declare invalidate or writeThrough.',
     ],
-  ])('rejects %s', (_scenario, policy) => {
-    expect(() => validateCachePolicy(policy)).toThrow(InvalidCachePolicyError);
-  });
+  ])(
+    'rejects %s with its stable error message',
+    (_scenario, policy, message) => {
+      expect(() => validateCachePolicy(policy)).toThrow(
+        new InvalidCachePolicyError(message),
+      );
+    },
+  );
 
   it('does not expose values from an invalid policy', () => {
     const secret = 'do-not-disclose';
