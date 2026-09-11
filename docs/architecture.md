@@ -755,15 +755,15 @@ This allows cache configuration to remain centralized without moving database im
 
 The library follows these mandatory design rules:
 
-- Use a pure function for deterministic transformations that have no state, lifecycle, or
-  external collaborator. Key encoding, key construction, and structural policy validation are
-  examples.
-- Use a class when it represents error identity, state, lifecycle, polymorphic behavior, or a
-  collaborator that must receive dependencies. A class must have one cohesive responsibility;
-  generic `Manager`, `Helper`, and catch-all `Service` classes are not acceptable abstractions.
+- Default to a class for cohesive logic, including validation, encoding, construction, and
+  composition. A class must have one cohesive responsibility; generic `Manager`, `Helper`, and
+  catch-all `Service` classes are not acceptable abstractions.
+- Use a standalone function only when its behavior is plainly stateless, has no validation or
+  collaborators, and does not benefit from encapsulation. A stable public function may also be a
+  thin compatibility facade that delegates immediately to an internal class.
 - Keep behavior that exists solely to support a class inside that class as a private method or
-  member. Keep independent functional operations in class-free modules; split files when a class
-  and a function have distinct responsibilities.
+  member. A source file contains either a class or standalone function declarations, never both;
+  class methods and required callbacks are part of the class rather than standalone operations.
 - Comments explain non-obvious decisions, constraints, or tool metadata. Do not use comments to
   restate names, types, or control flow that the code already expresses.
 - Use an immutable internal Value Object when a primitive has a stable technical meaning and

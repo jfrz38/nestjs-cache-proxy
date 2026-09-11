@@ -37,6 +37,8 @@ provider mutations without overstating consistency guarantees.
 - Typed effect contexts and exact key integration.
 - Fail-open operation reporting seam.
 - Call-order and race documentation.
+- Introduce `ValidatedCachePolicy.create()` and internal validated effect models so the runtime
+  compiler consumes policy structure already checked by the specialized validators.
 
 ## Expected files and components
 
@@ -54,6 +56,8 @@ provider mutations without overstating consistency guarantees.
 5. Route each cache failure to the error reporting seam and continue safely.
 6. Preserve the exact provider result and rejection semantics.
 7. Add examples for entity update, query invalidation, and constant-list invalidation.
+8. Make the runtime compiler consume `ValidatedCachePolicy` rather than reinterpreting raw policy
+   input.
 
 ## Tests
 
