@@ -1,5 +1,5 @@
 import { Scope } from '@nestjs/common';
-import { SCOPE_OPTIONS_METADATA } from '@nestjs/common/constants';
+import { SCOPE_OPTIONS_METADATA } from '@nestjs/common/constants.js';
 
 import { validateCachePolicy } from '../policy/validate-policy.js';
 import type { CachedProvider } from './cached-provider.types.js';
