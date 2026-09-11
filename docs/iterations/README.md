@@ -21,7 +21,7 @@ contract over features that depend on cache-store internals.
 | [01](01-project-foundation.md)             | Complete | Establish the package, toolchain, CI, and distributable build. |
 | [02](02-typed-policy-api.md)               | Complete | Define the public, strongly typed policy API.                  |
 | [03](03-cache-key-contracts.md)            | Complete | Make keys and TTL deterministic, safe contracts.               |
-| [04](04-runtime-cache-aside-proxy.md)      | Planned  | Implement the framework-independent cache-aside proxy.         |
+| [04](04-runtime-cache-aside-proxy.md)      | Complete | Implement the framework-independent cache-aside proxy.         |
 | [05](05-nestjs-provider-integration.md)    | Planned  | Register singleton `useClass` providers transparently.         |
 | [06](06-dynamic-modules.md)                | Planned  | Compose root and feature dynamic modules.                      |
 | [07](07-mutation-cache-effects.md)         | Planned  | Add source-first exact invalidation and write-through.         |
