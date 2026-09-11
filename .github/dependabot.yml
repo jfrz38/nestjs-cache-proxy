@@ -4,10 +4,25 @@ updates:
     directory: /code
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
     groups:
-      development-dependencies:
+      npm-development:
         dependency-type: development
+      npm-peer-dependencies:
+        patterns:
+          - "@nestjs/cache-manager"
+          - "@nestjs/common"
+          - "@nestjs/core"
+          - "cache-manager"
+          - "reflect-metadata"
+          - "rxjs"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
