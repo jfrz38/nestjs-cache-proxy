@@ -70,6 +70,9 @@ async function createConsumer(type) {
           'nestjs-cache-proxy': `file:${tarball}`,
           rxjs: '^7.8.2',
         },
+        devDependencies: {
+          '@types/node': '24.10.1',
+        },
         private: true,
         type,
       },
@@ -132,7 +135,7 @@ try {
 
   await writeFile(
     join(esmDirectory, 'index.ts'),
-    "import { defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\nvoid policy;\n",
+    "import { cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\n",
   );
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(
@@ -146,6 +149,8 @@ try {
       'NodeNext',
       '--target',
       'ES2022',
+      '--types',
+      'node',
       'index.ts',
     ],
     esmDirectory,
