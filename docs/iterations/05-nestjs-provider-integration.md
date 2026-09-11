@@ -1,5 +1,7 @@
 # Iteration 05: NestJS Provider Integration
 
+**Status:** Complete
+
 ## Context and motivation
 
 The product becomes useful when a consumer can inject its original token while NestJS
@@ -27,6 +29,10 @@ implementation token and NestJS `CACHE_MANAGER`.
 - `provide === useClass` is valid because the concrete class is rebound internally; direct
   self-injection of the public token remains a real cycle and is reported by NestJS.
 - The proxy is not required to satisfy `instanceof useClass`.
+- Nest lifecycle hooks execute only on the internal concrete provider. The public proxy hides
+  those infrastructure hooks so NestJS does not execute them twice.
+- Duplicate public tokens are validated by `forFeature` in iteration 06; a single
+  `cachedProvider` descriptor cannot observe sibling registrations.
 
 ## Functional scope
 
@@ -40,8 +46,7 @@ implementation token and NestJS `CACHE_MANAGER`.
 - Typed NestJS registration descriptor.
 - Internal implementation token creation and provider factory.
 - Injection of `CACHE_MANAGER` and root options token.
-- Startup validation for token, scope, policy, and duplicate registration defects that can
-  be detected locally.
+- Startup validation for token, scope, and policy defects that can be detected locally.
 
 ## Expected files and components
 
@@ -58,7 +63,7 @@ implementation token and NestJS `CACHE_MANAGER`.
 3. Register `useClass` under that internal token.
 4. Register the public-token factory and create the runtime proxy from explicit collaborators.
 5. Wire global options and `CACHE_MANAGER` without configuring a backend.
-6. Validate unsupported scopes and malformed or duplicate local registrations.
+6. Validate unsupported scopes and malformed local registrations.
 7. Verify dependency resolution and provider lifecycle hooks.
 
 ## Tests
@@ -66,7 +71,7 @@ implementation token and NestJS `CACHE_MANAGER`.
 - Nest integration tests for class, abstract-class, string, and symbol public tokens.
 - Constructor dependency and lifecycle tests for the concrete implementation.
 - Tests proving consumer and implementation source remain cache-agnostic.
-- Failure tests for request/transient scope, duplicate tokens, missing root configuration,
+- Failure tests for request/transient scope, missing root configuration,
   malformed policies, and dependency cycles where diagnostics are controllable.
 
 ## Acceptance criteria
@@ -82,7 +87,8 @@ implementation token and NestJS `CACHE_MANAGER`.
 ## Definition of Done
 
 The global Definition of Done applies. Tests use real NestJS testing modules rather than
-mocking the dependency-injection container.
+mocking the dependency-injection container. Duplicate-token validation is intentionally
+deferred to `forFeature` in iteration 06.
 
 ## Non-goals
 
@@ -116,3 +122,4 @@ behavior, and troubleshooting for cycles and duplicate tokens.
 - Provider construction/lifecycle assertions
 - Token compatibility matrix
 - Reviewed bootstrap validation messages
+- `pnpm run typecheck` and `pnpm run test` pass with NestJS 12.0.1 and cache-manager 7.2.9.

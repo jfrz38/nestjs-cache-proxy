@@ -2,8 +2,33 @@
 
 Transparent, declarative caching for NestJS providers using DI, proxies, and cache-manager.
 
-The typed cache-policy API and framework-independent runtime cache-aside proxy are available.
-NestJS provider integration is implemented in a later iteration.
+The typed cache-policy API, framework-independent runtime cache-aside proxy, and NestJS
+singleton `useClass` provider integration are available.
+
+## NestJS Providers
+
+`cachedProvider` returns the provider definitions consumed by the upcoming
+`CacheProxyModule.forFeature`. It registers the concrete implementation under an internal
+symbol and publishes its caching proxy under the original token:
+
+```ts
+const providers = cachedProvider({
+  provide: UserRepository,
+  useClass: SqlUserRepository,
+  policy: userCachePolicy,
+});
+```
+
+Public tokens may be classes, abstract classes, strings, or symbols. The implementation must be
+singleton-scoped; request and transient implementations fail before bootstrap. NestJS resolves its
+constructor dependencies normally and invokes lifecycle hooks once on the concrete implementation.
+The public proxy deliberately does not expose lifecycle hooks and is not guaranteed to satisfy
+`instanceof SqlUserRepository`. A direct self-injection through the public token remains a NestJS
+circular dependency.
+
+Applications provide `CACHE_MANAGER` through `CacheModule` and the library root options in the
+next dynamic-module iteration. Duplicate tokens are likewise validated by `forFeature`, not by an
+individual `cachedProvider` descriptor.
 
 ## Typed Policies
 
