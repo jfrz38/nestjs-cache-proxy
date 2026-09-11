@@ -1,5 +1,6 @@
 import {
   buildCacheKey,
+  cachedProvider,
   defineCachePolicy,
   type BuildCacheKeyInput,
   type CachedProvider,
@@ -105,6 +106,26 @@ const provider: CachedProvider<UserRepository> = {
   useClass: DefaultUserRepository,
   policy,
 };
+
+cachedProvider(provider);
+
+cachedProvider<UserRepository>({
+  provide: UserRepository,
+  // @ts-expect-error useClass cannot be an abstract class.
+  useClass: UserRepository,
+  policy,
+});
+
+cachedProvider<UserRepository>({
+  provide: UserRepository,
+  // @ts-expect-error useClass must implement the public token contract.
+  useClass: class {
+    public findById(): Promise<string> {
+      return Promise.resolve('invalid');
+    }
+  },
+  policy,
+});
 
 void provider;
 void structuredInput;

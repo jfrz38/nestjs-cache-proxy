@@ -1,8 +1,5 @@
 import type { BuildCacheKeyInput } from './cache-key.types.js';
-import { CacheKey } from './cache-key.js';
-import { CacheKeyVersion } from './cache-key-version.js';
-import { CacheNamespace } from './cache-namespace.js';
-import { CacheResourceName } from './cache-resource-name.js';
+import { CacheKeyBuilder } from './cache-key-builder.js';
 
 export function buildCacheKey({
   input,
@@ -10,10 +7,5 @@ export function buildCacheKey({
   resource,
   version,
 }: BuildCacheKeyInput): string {
-  return CacheKey.create({
-    input,
-    namespace: CacheNamespace.from(namespace),
-    resource: CacheResourceName.from(resource),
-    version: CacheKeyVersion.from(version),
-  }).value;
+  return new CacheKeyBuilder().build({ input, namespace, resource, version });
 }
