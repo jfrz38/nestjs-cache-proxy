@@ -1,4 +1,6 @@
-import { isValidTtl } from './validate-ttl.js';
+import { CacheKeyVersion } from '../key/cache-key-version.js';
+import { InvalidCachePolicyError } from './invalid-cache-policy-error.js';
+import { TimeToLive } from './time-to-live.js';
 
 const resourceFields = new Set(['key', 'method', 'ttl', 'version']);
 const cacheRuleFields = new Set(['cache']);
@@ -7,14 +9,6 @@ const invalidateFields = new Set(['invalidate']);
 const writeThroughFields = new Set(['writeThrough']);
 const invalidateDefinitionFields = new Set(['keyArgs', 'resource']);
 const writeThroughDefinitionFields = new Set(['keyArgs', 'resource', 'value']);
-
-/** Raised when a cache policy cannot be interpreted safely. */
-export class InvalidCachePolicyError extends Error {
-  public constructor(message: string) {
-    super(message);
-    this.name = 'InvalidCachePolicyError';
-  }
-}
 
 /**
  * Validates only structure available at policy-definition time. Provider method shapes are
@@ -60,13 +54,17 @@ function validateResource(name: string, resource: unknown): void {
     throw invalid(`Resource "${name}" must declare a method name.`);
   }
 
-  if (!isValidTtl(resource.ttl)) {
+  try {
+    TimeToLive.fromMilliseconds(resource.ttl);
+  } catch {
     throw invalid(
       `Resource "${name}" must declare a positive integer TTL in milliseconds.`,
     );
   }
 
-  if (!isValidTtl(resource.version)) {
+  try {
+    CacheKeyVersion.from(resource.version);
+  } catch {
     throw invalid(
       `Resource "${name}" must declare a positive integer version.`,
     );
