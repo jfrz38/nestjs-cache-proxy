@@ -16,11 +16,13 @@ configured Promise methods and faithfully passes through all other behavior.
   operations, not NestJS decorators or module metadata.
 - Runtime receives that port and its compiled policy through explicit factory arguments; it does
   not introduce a second dependency-injection container.
-- Public key and policy facades remain pure functions. The runtime compiles their primitive input
-  into immutable internal Value Objects for namespace, resource name, key version, TTL, and key;
-  runtime classes own their collaborators and behavior without becoming public API.
-- Class-specific behavior is encapsulated in private members. Independent transformations remain
-  in class-free modules, and compiled runtime classes use one file per class.
+- Public key and policy functions remain stable facades that delegate immediately to internal
+  classes. The runtime compiles their primitive input into immutable internal Value Objects for
+  namespace, resource name, key version, TTL, and key; runtime classes own their collaborators
+  and behavior without becoming public API.
+- Each source file contains either a class or standalone function declarations. Class-specific
+  behavior is encapsulated in private members; a function remains only when it is an obvious
+  stateless operation or a public compatibility facade.
 - A configured call performs key build, cache get, provider call on miss, best-effort set,
   and returns the provider result.
 - The runtime cache port is private and has only asynchronous `get(key)` and

@@ -31,6 +31,8 @@ implementation token and NestJS `CACHE_MANAGER`.
 - The proxy is not required to satisfy `instanceof useClass`.
 - Nest lifecycle hooks execute only on the internal concrete provider. The public proxy hides
   those infrastructure hooks so NestJS does not execute them twice.
+- Registration validation, provider assembly, cache-manager adaptation, and lifecycle filtering
+  each live in a self-contained class; `cachedProvider` remains the public compatibility facade.
 - Duplicate public tokens are validated by `forFeature` in iteration 06; a single
   `cachedProvider` descriptor cannot observe sibling registrations.
 

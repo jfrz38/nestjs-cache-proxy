@@ -2,7 +2,7 @@ import type { StructuredKeyInput } from '../key/structured-key.types.js';
 import { CacheKeyVersion } from '../key/cache-key-version.js';
 import { CacheResourceName } from '../key/cache-resource-name.js';
 import { TimeToLive } from '../policy/time-to-live.js';
-import { validateCachePolicy } from '../policy/validate-policy.js';
+import { CachePolicyValidator } from '../policy/cache-policy-validator.js';
 import { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CompiledReadRule } from './compiled-read-rule.js';
 
@@ -22,8 +22,10 @@ interface RuntimeMethodRule {
 }
 
 export class CachePolicyCompiler {
+  private readonly validator = new CachePolicyValidator();
+
   public compile(policy: unknown): CompiledCachePolicy {
-    validateCachePolicy(policy);
+    this.validator.validate(policy);
 
     const runtimePolicy = policy as RuntimePolicy;
     const reads = new Map<string, CompiledReadRule>();
