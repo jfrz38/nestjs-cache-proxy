@@ -1,3 +1,6 @@
+const CACHE_OPERATION_ERROR_MESSAGE = 'A cache operation failed.';
+const CACHE_OPERATION_ERROR_NAME = 'CacheOperationError';
+
 export interface CacheErrorEvent {
   readonly cause: Error;
   readonly operation: 'delete' | 'get' | 'set';
@@ -6,7 +9,7 @@ export interface CacheErrorEvent {
 
 export class CacheOperationError extends Error {
   public constructor() {
-    super('A cache operation failed.');
-    this.name = 'CacheOperationError';
+    super(CACHE_OPERATION_ERROR_MESSAGE);
+    this.name = CACHE_OPERATION_ERROR_NAME;
   }
 }

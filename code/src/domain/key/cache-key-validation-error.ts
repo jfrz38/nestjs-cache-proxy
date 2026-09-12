@@ -1,3 +1,9 @@
+const CACHE_KEY_VALIDATION_ERROR_NAME = 'CacheKeyValidationError';
+const INVALID_CACHE_KEY_NAMESPACE_ERROR_NAME = 'InvalidCacheKeyNamespaceError';
+const INVALID_CACHE_KEY_RESOURCE_ERROR_NAME = 'InvalidCacheKeyResourceError';
+const INVALID_CACHE_KEY_VERSION_ERROR_NAME = 'InvalidCacheKeyVersionError';
+const INVALID_CACHE_KEY_INPUT_ERROR_NAME = 'InvalidCacheKeyInputError';
+
 export type CacheKeyValidationCode =
   | 'INVALID_NAMESPACE'
   | 'INVALID_RESOURCE'
@@ -10,34 +16,34 @@ export class CacheKeyValidationError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'CacheKeyValidationError';
+    this.name = CACHE_KEY_VALIDATION_ERROR_NAME;
   }
 }
 
 export class InvalidCacheKeyNamespaceError extends CacheKeyValidationError {
   public constructor(message: string) {
     super('INVALID_NAMESPACE', message);
-    this.name = 'InvalidCacheKeyNamespaceError';
+    this.name = INVALID_CACHE_KEY_NAMESPACE_ERROR_NAME;
   }
 }
 
 export class InvalidCacheKeyResourceError extends CacheKeyValidationError {
   public constructor(message: string) {
     super('INVALID_RESOURCE', message);
-    this.name = 'InvalidCacheKeyResourceError';
+    this.name = INVALID_CACHE_KEY_RESOURCE_ERROR_NAME;
   }
 }
 
 export class InvalidCacheKeyVersionError extends CacheKeyValidationError {
   public constructor(message: string) {
     super('INVALID_VERSION', message);
-    this.name = 'InvalidCacheKeyVersionError';
+    this.name = INVALID_CACHE_KEY_VERSION_ERROR_NAME;
   }
 }
 
 export class InvalidCacheKeyInputError extends CacheKeyValidationError {
   public constructor(message: string) {
     super('INVALID_INPUT', message);
-    this.name = 'InvalidCacheKeyInputError';
+    this.name = INVALID_CACHE_KEY_INPUT_ERROR_NAME;
   }
 }
