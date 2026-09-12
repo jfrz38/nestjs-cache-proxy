@@ -1,6 +1,7 @@
 import type { DynamicModule } from '@nestjs/common';
 
 import { CacheNamespace } from '../../domain/key/cache-namespace.js';
+import type { CacheResourceMap } from '../../domain/policy/policy.types.js';
 import { cachedProvider } from './cached-provider.js';
 import {
   CACHE_PROXY_OPTIONS,
@@ -24,9 +25,10 @@ export class CacheProxyModule {
     };
   }
 
-  public static forFeature<T extends object>(
-    registrations: readonly CachedProvider<T>[],
-  ): DynamicModule {
+  public static forFeature<
+    T extends object,
+    Resources extends Record<string, unknown> = CacheResourceMap<T>,
+  >(registrations: readonly CachedProvider<T, Resources>[]): DynamicModule {
     CacheProxyModule.assertRegistrations(registrations);
     CacheProxyModule.validateRegistrations(registrations);
 
@@ -63,9 +65,10 @@ export class CacheProxyModule {
     return normalizedOptions;
   }
 
-  private static validateRegistrations<T extends object>(
-    registrations: readonly CachedProvider<T>[],
-  ): void {
+  private static validateRegistrations<
+    T extends object,
+    Resources extends Record<string, unknown>,
+  >(registrations: readonly CachedProvider<T, Resources>[]): void {
     const tokens = new Set<RuntimeToken<T>>();
     for (const registration of registrations) {
       if (tokens.has(registration.provide)) {

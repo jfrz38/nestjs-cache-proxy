@@ -15,7 +15,9 @@ export class CachedProviderFactory {
     private readonly proxyFactory = new NestCacheProxyFactory(),
   ) {}
 
-  public create<T extends object>(registration: CachedProvider<T>): Provider[] {
+  public create<T extends object, Resources extends Record<string, unknown>>(
+    registration: CachedProvider<T, Resources>,
+  ): Provider[] {
     this.registrationValidator.validate(registration);
 
     const implementationToken = createImplementationToken();

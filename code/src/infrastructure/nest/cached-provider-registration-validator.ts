@@ -10,7 +10,9 @@ export class CachedProviderRegistrationValidator {
     private readonly policyValidator: CachePolicyValidator = new CachePolicyValidator(),
   ) {}
 
-  public validate<T extends object>(registration: CachedProvider<T>): void {
+  public validate<T extends object, Resources extends Record<string, unknown>>(
+    registration: CachedProvider<T, Resources>,
+  ): void {
     if (!this.isRecord(registration)) {
       throw new InvalidCachedProviderError(
         'Cached provider registration must be an object.',
