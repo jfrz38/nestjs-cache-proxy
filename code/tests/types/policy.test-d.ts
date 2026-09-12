@@ -3,6 +3,8 @@ import {
   cachedProvider,
   defineCachePolicy,
   type BuildCacheKeyInput,
+  type CacheErrorEvent,
+  type CacheErrorHook,
   type CachedProvider,
   type StructuredKeyInput,
 } from '../../src/index.js';
@@ -76,6 +78,10 @@ const cacheKeyInput: BuildCacheKeyInput = {
 };
 
 const cacheKey = buildCacheKey(cacheKeyInput);
+const cacheErrorHook: CacheErrorHook = (event: CacheErrorEvent) => {
+  const operation: 'delete' | 'get' | 'set' = event.operation;
+  void operation;
+};
 
 class DefaultUserRepository extends UserRepository {
   public findById(id: string): Promise<User | null> {
@@ -130,6 +136,7 @@ cachedProvider<UserRepository>({
 void provider;
 void structuredInput;
 void cacheKey;
+void cacheErrorHook;
 
 defineCachePolicy<UserRepository>()({
   resources: {

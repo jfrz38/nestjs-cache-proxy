@@ -49,12 +49,18 @@ export class CacheProxyModule {
     }
 
     const namespace = CacheNamespace.from(options.namespace);
-    return {
+    const normalizedOptions: CacheProxyOptions = {
       namespace: {
         application: namespace.application,
         environment: namespace.environment,
       },
     };
+
+    if (options.onCacheError !== undefined) {
+      return { ...normalizedOptions, onCacheError: options.onCacheError };
+    }
+
+    return normalizedOptions;
   }
 
   private static validateRegistrations<T extends object>(
