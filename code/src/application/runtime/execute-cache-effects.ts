@@ -1,6 +1,5 @@
 import type { CacheNamespace } from '../../domain/key/cache-namespace.js';
-import type { CacheErrorReporter } from './cache-error-reporter.port.js';
-import type { CacheStore } from './cache-store.port.js';
+import { CacheOperations } from './cache-operations.js';
 import {
   CacheEffectKind,
   type CompiledCacheEffect,
@@ -8,9 +7,8 @@ import {
 
 export class CacheEffectsExecutor {
   public constructor(
-    private readonly cache: CacheStore,
+    private readonly cache: CacheOperations,
     private readonly namespace: CacheNamespace,
-    private readonly reporter: CacheErrorReporter,
   ) {}
 
   public async execute(
@@ -28,29 +26,21 @@ export class CacheEffectsExecutor {
     args: readonly unknown[],
     result: unknown,
   ): Promise<void> {
-    const operation =
-      effect.kind === CacheEffectKind.INVALIDATE ? 'delete' : 'set';
-
     try {
       const key = effect.buildCacheKey(this.namespace, args, result);
 
       if (effect.kind === CacheEffectKind.INVALIDATE) {
-        await this.cache.delete(key);
+        await this.cache.delete(effect.resource, key);
       } else {
-        await this.cache.set(key, effect.value(args, result), effect.ttl);
+        await this.cache.set(
+          effect.resource,
+          key,
+          effect.value(args, result),
+          effect.ttl,
+        );
       }
-    } catch (cause) {
-      await this.report({ cause, operation, resource: effect.resource });
-    }
-  }
-
-  private async report(
-    event: Parameters<CacheErrorReporter['report']>[0],
-  ): Promise<void> {
-    try {
-      await this.reporter.report(event);
     } catch {
-      // Reporting is observational and must not affect provider behavior.
+      // Key derivation failures are policy failures and preserve the existing fail-open effect behavior.
     }
   }
 }

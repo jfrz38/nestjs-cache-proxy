@@ -1,10 +1,10 @@
 import { CacheNamespace } from '../../domain/key/cache-namespace.js';
-import type { CacheStore } from './cache-store.port.js';
+import { CacheOperations } from './cache-operations.js';
 import type { CompiledReadRule } from './compiled-read-rule.js';
 
 export class CacheAsideExecutor {
   public constructor(
-    private readonly cache: CacheStore,
+    private readonly cache: CacheOperations,
     private readonly namespace: CacheNamespace,
   ) {}
 
@@ -16,25 +16,18 @@ export class CacheAsideExecutor {
     const key = rule.buildCacheKey(this.namespace, args);
 
     try {
-      const value = await this.cache.get(key);
+      const value = await this.cache.get<Result>(rule.resource.value, key);
 
-      // Until the iteration 08 envelope, null and undefined are backend misses.
-      if (value !== undefined && value !== null) {
-        return value as Result;
+      if (value !== undefined) {
+        return value;
       }
     } catch {
-      // A cache read failure is deliberately equivalent to a miss.
+      // CacheOperations is fail-open. This preserves that property for custom implementations.
     }
 
     const result = await invoke();
 
-    if (result !== undefined && result !== null) {
-      try {
-        await this.cache.set(key, result, rule.ttl);
-      } catch {
-        // A cache write failure must not replace the provider result.
-      }
-    }
+    await this.cache.set(rule.resource.value, key, result, rule.ttl);
 
     return result;
   }
