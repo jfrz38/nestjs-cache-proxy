@@ -120,7 +120,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import { CacheProxyModule, defineCachePolicy } from 'nestjs-cache-proxy'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function') process.exit(1);",
+      "import { CacheProxyModule, defineCachePolicy } from 'nestjs-cache-proxy'; import { createTestCache } from 'nestjs-cache-proxy/testing'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function' || typeof createTestCache !== 'function') process.exit(1);",
     ],
     esmDirectory,
   );
@@ -128,14 +128,14 @@ try {
     node,
     [
       '--eval',
-      "const { CacheProxyModule, defineCachePolicy } = require('nestjs-cache-proxy'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function') process.exit(1);",
+      "const { CacheProxyModule, defineCachePolicy } = require('nestjs-cache-proxy'); const { createTestCache } = require('nestjs-cache-proxy/testing'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function' || typeof createTestCache !== 'function') process.exit(1);",
     ],
     cjsDirectory,
   );
 
   await writeFile(
     join(esmDirectory, 'index.ts'),
-    "import { CacheProxyModule, cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\nCacheProxyModule.forRoot({ namespace: { application: 'consumer', environment: 'test' } });\nCacheProxyModule.forFeature([{ provide: 'provider', useClass: DefaultProvider, policy }]);\n",
+    "import { CacheProxyModule, cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\nimport { buildPolicyCacheKey, createTestCache } from 'nestjs-cache-proxy/testing';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\nconst testCache = createTestCache();\nconst key: string = buildPolicyCacheKey({ args: ['1'], namespace: { application: 'consumer', environment: 'test' }, policy, resource: 'byId' });\nvoid testCache;\nvoid key;\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\nCacheProxyModule.forRoot({ namespace: { application: 'consumer', environment: 'test' } });\nCacheProxyModule.forFeature([{ provide: 'provider', useClass: DefaultProvider, policy }]);\n",
   );
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(

@@ -8,6 +8,11 @@ import {
   type CachedProvider,
   type StructuredKeyInput,
 } from '../../src/index.js';
+import {
+  buildPolicyCacheKey,
+  createTestCache,
+  type TestCache,
+} from '../../src/testing/index.js';
 
 abstract class UserRepository {
   public abstract findById(id: string): Promise<User | null>;
@@ -137,6 +142,24 @@ void provider;
 void structuredInput;
 void cacheKey;
 void cacheErrorHook;
+
+const testCache: TestCache = createTestCache();
+const policyCacheKey = buildPolicyCacheKey({
+  args: ['user-1'],
+  namespace: { application: 'users-api', environment: 'test' },
+  policy,
+  resource: 'userById',
+});
+void testCache;
+void policyCacheKey;
+
+buildPolicyCacheKey({
+  // @ts-expect-error The resource key function requires one string argument.
+  args: [],
+  namespace: { application: 'users-api', environment: 'test' },
+  policy,
+  resource: 'userById',
+});
 
 defineCachePolicy<UserRepository>()({
   resources: {
