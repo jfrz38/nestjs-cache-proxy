@@ -11,7 +11,10 @@ import {
   defineCachePolicy,
   InvalidCachedProviderError,
 } from '../../../src/index.js';
-import { createTestCache } from '../../../src/testing/index.js';
+import {
+  createTestCache,
+  TestCacheOperationType,
+} from '../../../src/testing/index.js';
 
 interface UserReader {
   findById(id: string): Promise<string>;
@@ -108,7 +111,9 @@ describe('CacheProxyModule', () => {
 
     expect(consumer.classReader.calls).toBe(1);
     expect(
-      testCache.operations().filter((operation) => operation.type === 'get'),
+      testCache
+        .operations()
+        .filter((operation) => operation.type === TestCacheOperationType.GET),
     ).toHaveLength(4);
     expect(module.get(CACHE_MANAGER)).toBe(testCache.cache);
     await module.close();

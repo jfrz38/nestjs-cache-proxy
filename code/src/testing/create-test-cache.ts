@@ -1,12 +1,20 @@
-import type { Cache } from 'cache-manager';
-
 import {
   CacheEnvelope,
   CacheEnvelopeState,
 } from '../application/runtime/cache-envelope.js';
 import { ManualTestClock, type TestClock } from './test-clock.js';
 
-export type TestCacheManager = Pick<Cache, 'del' | 'get' | 'set'>;
+export interface TestCacheManager {
+  del(key: string): Promise<boolean>;
+  get<Value>(key: string): Promise<Value | undefined>;
+  set<Value>(key: string, value: Value, ttl?: number): Promise<Value>;
+}
+
+export enum TestCacheOperationType {
+  DELETE = 'delete',
+  GET = 'get',
+  SET = 'set',
+}
 
 export interface TestCacheEntry {
   readonly expiresAt: number | undefined;
@@ -19,19 +27,19 @@ export type TestCacheOperation =
       readonly at: number;
       readonly hit: boolean;
       readonly key: string;
-      readonly type: 'get';
+      readonly type: TestCacheOperationType.GET;
     }
   | {
       readonly at: number;
       readonly key: string;
-      readonly type: 'delete';
+      readonly type: TestCacheOperationType.DELETE;
     }
   | {
       readonly at: number;
       readonly expiresAt: number | undefined;
       readonly key: string;
       readonly ttl: number | undefined;
-      readonly type: 'set';
+      readonly type: TestCacheOperationType.SET;
       readonly value: unknown;
     };
 
@@ -77,7 +85,7 @@ export function createTestCache(
         Object.freeze({
           at: clock.now,
           key,
-          type: 'delete',
+          type: TestCacheOperationType.DELETE,
         }),
       );
       return Promise.resolve(deleted);
@@ -89,7 +97,7 @@ export function createTestCache(
           at: clock.now,
           hit: entry !== undefined,
           key,
-          type: 'get',
+          type: TestCacheOperationType.GET,
         }),
       );
       return Promise.resolve(entry?.value as Value | undefined);
@@ -103,7 +111,7 @@ export function createTestCache(
           expiresAt,
           key,
           ttl,
-          type: 'set',
+          type: TestCacheOperationType.SET,
           value: inspectValue(value),
         }),
       );

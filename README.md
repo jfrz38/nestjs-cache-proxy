@@ -152,6 +152,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   buildPolicyCacheKey,
   createTestCache,
+  TestCacheOperationType,
 } from 'nestjs-cache-proxy/testing';
 
 const testCache = createTestCache();
@@ -171,7 +172,7 @@ await testCache.seed(key, { id: 'user-1' }, 60_000);
 testCache.clock.advanceBy(60_000);
 expect(testCache.entries()).toEqual([]);
 expect(testCache.operations()).toContainEqual(
-  expect.objectContaining({ key, type: 'get' }),
+  expect.objectContaining({ key, type: TestCacheOperationType.GET }),
 );
 ```
 

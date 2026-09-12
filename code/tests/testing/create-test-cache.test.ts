@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { CacheEnvelope } from '../../src/application/runtime/cache-envelope.js';
-import { createTestCache } from '../../src/testing/index.js';
+import {
+  createTestCache,
+  TestCacheOperationType,
+} from '../../src/testing/index.js';
 
 describe('createTestCache', () => {
   it('expires entries exactly at their deterministic TTL boundary', async () => {
@@ -14,9 +17,21 @@ describe('createTestCache', () => {
     await expect(testCache.cache.get('user:1')).resolves.toBeUndefined();
 
     expect(testCache.operations()).toEqual([
-      expect.objectContaining({ key: 'user:1', ttl: 1_000, type: 'set' }),
-      expect.objectContaining({ hit: true, key: 'user:1', type: 'get' }),
-      expect.objectContaining({ hit: false, key: 'user:1', type: 'get' }),
+      expect.objectContaining({
+        key: 'user:1',
+        ttl: 1_000,
+        type: TestCacheOperationType.SET,
+      }),
+      expect.objectContaining({
+        hit: true,
+        key: 'user:1',
+        type: TestCacheOperationType.GET,
+      }),
+      expect.objectContaining({
+        hit: false,
+        key: 'user:1',
+        type: TestCacheOperationType.GET,
+      }),
     ]);
   });
 
@@ -36,15 +51,15 @@ describe('createTestCache', () => {
       { expiresAt: 1_000, key: 'user:3', value: { id: '3' } },
     ]);
     expect(testCache.operations()[0]).toMatchObject({
-      type: 'set',
+      type: TestCacheOperationType.SET,
       value: null,
     });
     expect(testCache.operations()[1]).toMatchObject({
-      type: 'set',
+      type: TestCacheOperationType.SET,
       value: false,
     });
     expect(testCache.operations()[2]).toMatchObject({
-      type: 'set',
+      type: TestCacheOperationType.SET,
       value: { id: '3' },
     });
   });

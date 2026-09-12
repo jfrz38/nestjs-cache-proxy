@@ -12,6 +12,7 @@ import {
   buildPolicyCacheKey,
   createTestCache,
   type TestCache,
+  TestCacheOperationType,
 } from '../../src/testing/index.js';
 
 abstract class UserRepository {
@@ -144,6 +145,8 @@ void cacheKey;
 void cacheErrorHook;
 
 const testCache: TestCache = createTestCache();
+const testCacheOperationType: TestCacheOperationType =
+  TestCacheOperationType.GET;
 const policyCacheKey = buildPolicyCacheKey({
   args: ['user-1'],
   namespace: { application: 'users-api', environment: 'test' },
@@ -151,6 +154,7 @@ const policyCacheKey = buildPolicyCacheKey({
   resource: 'userById',
 });
 void testCache;
+void testCacheOperationType;
 void policyCacheKey;
 
 buildPolicyCacheKey({
