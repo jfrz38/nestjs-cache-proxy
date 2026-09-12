@@ -1,5 +1,7 @@
 # Iteration 11: Release Readiness
 
+**Status:** Complete
+
 ## Context and motivation
 
 Passing source tests is insufficient for a library release. Consumers install a tarball,
@@ -42,7 +44,7 @@ documentation, compatibility evidence, and repeatable pre-release checks.
 
 - expanded `README.md`
 - `CHANGELOG.md`, `CONTRIBUTING.md`, and security/contact documentation as appropriate
-- `docs/compatibility.md`, `docs/testing.md`, or equivalent maintained guides
+- README compatibility and testing guidance, plus maintained architecture documentation
 - isolated package consumer fixtures
 - release checklist/script that does not publish
 
@@ -110,8 +112,10 @@ troubleshooting, changelog, versioning, and contribution documentation.
 
 ## Exit evidence
 
-- Clean full-suite report
-- Tarball file manifest and size
-- ESM/CommonJS/NestJS consumer smoke results
-- Public export and declaration audit
-- Reviewed release checklist and documentation links
+- `make release-check` executes formatting, linting, types, tests, coverage, build, packed
+  artifact checks, and memory/Redis contracts without publication.
+- The tarball manifest allows only `dist`, `README.md`, `LICENSE`, and `package.json`, with a
+  one-megabyte size limit and an extracted-content secret scan.
+- Isolated ESM/CommonJS consumers load both public entry points, a NestJS TypeScript consumer
+  fixture compiles, and an internal export path is rejected.
+- The package metadata and declarations are audited for the 0.1.0 public allowlist.

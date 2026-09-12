@@ -27,8 +27,8 @@ contract over features that depend on cache-store internals.
 | [07](07-mutation-cache-effects.md)         | Complete | Add source-first exact invalidation and write-through.         |
 | [08](08-resilience-and-value-semantics.md) | Complete | Define fail-open behavior and unambiguous cached values.       |
 | [09](09-testing-public-api.md)             | Complete | Publish deterministic cache contract testing utilities.        |
-| [10](10-backend-compatibility.md)          | Planned  | Verify memory and one Redis/Keyv configuration.                |
-| [11](11-release-readiness.md)              | Planned  | Complete packaging, documentation, and release evidence.       |
+| [10](10-backend-compatibility.md)          | Complete | Verify memory and one Redis/Keyv configuration.                |
+| [11](11-release-readiness.md)              | Complete | Complete packaging, documentation, and release evidence.       |
 
 Post-MVP candidates are ordered in the [roadmap](roadmap.md). Their APIs are deliberately
 not designed by this plan.

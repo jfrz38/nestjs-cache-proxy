@@ -1,17 +1,31 @@
 # nestjs-cache-proxy
 
-Transparent, declarative caching for NestJS providers using DI, proxies, and cache-manager.
+Transparent, declarative caching for NestJS providers. Define cache behavior next to a
+provider contract; the package supplies a proxy while your application continues to own
+the cache backend and its operational configuration.
 
-The typed cache-policy API, framework-independent runtime cache-aside proxy, and NestJS
-dynamic-module provider integration are available.
+## Requirements
 
-## NestJS Providers
+- Node.js 20.19.0 or later
+- NestJS 11 or 12
+- `@nestjs/cache-manager` and `cache-manager`
 
-Configure the library once alongside an application-owned global `CacheModule`. `forRoot` only
-normalizes the namespace; it never registers a cache backend. Its global options provider allows
-feature modules to keep the documented `forFeature(registrations)` API:
+## Install
+
+```sh
+pnpm add nestjs-cache-proxy @nestjs/cache-manager cache-manager
+```
+
+## Quick start
+
+Configure an application-owned `CacheModule` once, then add `CacheProxyModule.forRoot`.
+The proxy module never creates or configures a cache backend.
 
 ```ts
+import { CacheModule } from '@nestjs/cache-manager';
+import { Module } from '@nestjs/common';
+import { CacheProxyModule } from 'nestjs-cache-proxy';
+
 @Module({
   imports: [
     CacheModule.register({ isGlobal: true }),
@@ -23,46 +37,16 @@ feature modules to keep the documented `forFeature(registrations)` API:
 export class ApplicationCacheModule {}
 ```
 
-Feature modules register and export their public cached tokens explicitly:
+Describe which Promise-returning methods are cacheable with a typed policy:
 
 ```ts
-@Module({
-  imports: [
-    CacheProxyModule.forFeature([
-      {
-        provide: UserRepository,
-        useClass: SqlUserRepository,
-        policy: userCachePolicy,
-      },
-    ]),
-  ],
-})
-export class UsersModule {}
-```
+import { defineCachePolicy } from 'nestjs-cache-proxy';
 
-`forFeature` delegates each descriptor to `cachedProvider`, which registers the concrete
-implementation under an internal symbol and publishes its caching proxy under the original token.
-Public tokens may be classes, abstract classes, strings, or symbols. Implementations must be
-singleton-scoped; request and transient implementations fail before bootstrap. NestJS resolves
-constructor dependencies normally and invokes lifecycle hooks once on the concrete implementation.
-The public proxy deliberately does not expose lifecycle hooks and is not guaranteed to satisfy
-`instanceof SqlUserRepository`. A direct self-injection through the public token remains a NestJS
-circular dependency.
+interface UserRepository {
+  findById(id: string): Promise<{ id: string; name: string } | null>;
+}
 
-Call `forRoot` once per application context. Duplicate roots and duplicate tokens across separate
-feature modules follow NestJS module-composition semantics and are unsupported; duplicate public
-tokens within one `forFeature` call fail immediately. A feature token is visible only to modules
-that import the feature module. `CacheProxyModule` does not import `CacheModule`: applications must
-make `CACHE_MANAGER` globally available as shown above, or provide it through an equivalent global
-application module.
-
-## Typed Policies
-
-Policies are plain, inline objects. A resource declares the Promise-returning method that
-defines its key arguments and cached result contract:
-
-```ts
-const userCachePolicy = defineCachePolicy<UserRepository>()({
+export const userCachePolicy = defineCachePolicy<UserRepository>()({
   resources: {
     userById: {
       method: 'findById',
@@ -77,154 +61,139 @@ const userCachePolicy = defineCachePolicy<UserRepository>()({
 });
 ```
 
-Only Promise-returning methods may be configured. Read rules use `cache`; mutations use a
-non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effects.
-
-## Runtime Cache-Aside
-
-The internal runtime validates each policy once and compiles immutable read and mutation rules with
-validated value objects for the namespace, resource, key version, TTL, and deterministic cache key.
-The public policy API remains a plain object with numeric `version` and `ttl` fields. A configured
-read builds its key, reads the cache, invokes the provider on a miss, awaits a best-effort write,
-and returns the provider result. Cache get and set failures fail open; provider errors propagate
-unchanged.
-
-For a configured mutation, the provider completes first, then exact invalidation and write-through
-effects run in declaration order. Every dynamic target needs `keyArgs({ args, result })`; it may be
-omitted only for a resource whose key builder declares no arguments. Write-through requires an
-explicit canonical `value({ args, result })`. Delete and set failures are reported through an
-internal, non-throwing seam and do not change the provider result. Effects never perform scans,
-prefix deletion, or atomic multi-key operations.
-
-The proxy preserves provider `this` binding, including ECMAScript private fields, and passes
-through properties, symbols, accessors, and unconfigured methods. Wrapper identity is stable per
-string-named method, but the proxy is not guaranteed to satisfy `instanceof` the concrete provider
-class. Concurrent misses are independent: a read started before a mutation can still repopulate a
-stale entry after its effect completes. Transaction rollback can likewise leave an early effect;
-use bounded TTLs until post-commit integration exists.
-
-The runtime is composed from `CachePolicyCompiler`, `CacheAsideExecutor`, and
-`CacheProxyFactory`. These framework-independent classes and their value objects are internal;
-NestJS composes them with the application's `CACHE_MANAGER`.
-
-The runtime stores a private value envelope so a cached `null` is a hit. `undefined` from a cache
-store is a miss, and provider `undefined` results are returned but not stored. Other falsy values
-such as `false`, `0`, and `''` are cacheable.
-
-## Cache Keys
-
-`buildCacheKey` exposes the deterministic `k1` contract used by later runtime iterations:
+Register the concrete singleton provider in its feature module. Consumers inject the
+original token and receive the caching proxy.
 
 ```ts
-const key = buildCacheKey({
-  namespace: { application: 'users-api', environment: 'production' },
-  resource: 'userById',
-  version: 1,
-  input: { tenantId: 'tenant-1', id: 'user-1' },
+import { Module } from '@nestjs/common';
+import { CacheProxyModule } from 'nestjs-cache-proxy';
+import { userCachePolicy } from './user-cache-policy.js';
+
+class SqlUserRepository {
+  public async findById(id: string) {
+    return { id, name: 'Ada Lovelace' };
+  }
+}
+
+@Module({
+  imports: [
+    CacheProxyModule.forFeature([
+      {
+        provide: SqlUserRepository,
+        useClass: SqlUserRepository,
+        policy: userCachePolicy,
+      },
+    ]),
+  ],
+  exports: [SqlUserRepository],
+})
+export class UsersModule {}
+```
+
+On a miss, the proxy calls the provider and attempts to write the result. Cache reads and
+writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
+strings are cacheable. `undefined` is returned but not stored.
+
+## Mutations
+
+Mutations run the provider first, then apply exact effects in declaration order. Use
+`invalidate` to remove a known key or `writeThrough` to replace it with a canonical value.
+
+```ts
+const policy = defineCachePolicy<
+  UserRepository & { rename(id: string, name: string): Promise<void> }
+>()({
+  resources: {
+    userById: {
+      method: 'findById',
+      version: 1,
+      ttl: 300_000,
+      key: ([id]) => id,
+    },
+  },
+  methods: {
+    findById: { cache: 'userById' },
+    rename: {
+      effects: [{ invalidate: 'userById', keyArgs: ({ args }) => [args[0]] }],
+    },
+  },
 });
 ```
 
-The resulting key starts with `ncp:k1:` followed by tagged canonical JSON. It distinguishes
-types such as `1` and `'1'`, preserves `-0`, recursively orders object keys, and encodes
-delimiters safely. The `input` accepts only `null`, booleans, finite numbers, strings, dense
-arrays, and plain string-keyed objects. It rejects cycles, accessors, sparse arrays, class
-instances, collections, symbols, functions, `BigInt`, and non-finite numbers.
-
-Validation failures extend `CacheKeyValidationError`. Consumers that need to handle a specific
-rule can use `InvalidCacheKeyNamespaceError`, `InvalidCacheKeyResourceError`,
-`InvalidCacheKeyVersionError`, or `InvalidCacheKeyInputError`; each has a stable `code` and
-does not include raw key input in its message.
-
-Include tenant identity in `input` whenever data is tenant-scoped. Do not include secrets,
-credentials, tokens, or other sensitive values: keys can be visible to cache infrastructure.
-Resource versions isolate incompatible entries; a version bump neither migrates nor deletes
-older entries. The `k1` payload is a persistent contract, so future representation changes
-must introduce a new format version.
+Effects do not scan, delete by prefix, or perform atomic multi-key operations. Include
+tenant identity in every tenant-scoped key input. Never include credentials, tokens, or
+other sensitive data in keys because cache infrastructure can expose them.
 
 ## Testing
 
-`nestjs-cache-proxy/testing` provides a deterministic in-memory cache for consumer tests. It has
-only the `get`, `set`, and `del` cache-manager operations used by this package, so inject
-`testCache.cache` when overriding the application-owned `CACHE_MANAGER`.
+`nestjs-cache-proxy/testing` supplies a deterministic in-memory cache for application
+tests. Override the application-owned `CACHE_MANAGER` with it; it is not a Redis or full
+cache-manager emulator.
 
 ```ts
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import {
-  buildPolicyCacheKey,
-  createTestCache,
-  TestCacheOperationType,
-} from 'nestjs-cache-proxy/testing';
+import { createTestCache } from 'nestjs-cache-proxy/testing';
 
 const testCache = createTestCache();
-const module = await Test.createTestingModule({ imports: [ApplicationModule] })
-  .overrideProvider(CACHE_MANAGER)
-  .useValue(testCache.cache)
-  .compile();
-
-const key = buildPolicyCacheKey({
-  args: ['user-1'],
-  namespace: { application: 'users-api', environment: 'test' },
-  policy: userCachePolicy,
-  resource: 'userById',
-});
-
-await testCache.seed(key, { id: 'user-1' }, 60_000);
+// Test.createTestingModule({ imports: [ApplicationModule] })
+//   .overrideProvider(CACHE_MANAGER)
+//   .useValue(testCache.cache);
+await testCache.seed('a-key', { id: 'user-1' }, 60_000);
 testCache.clock.advanceBy(60_000);
-expect(testCache.entries()).toEqual([]);
-expect(testCache.operations()).toContainEqual(
-  expect.objectContaining({ key, type: TestCacheOperationType.GET }),
-);
 ```
 
-The manual clock starts at zero, advances only through `advanceBy`, and `reset()` clears entries,
-operations, and time. Inspection returns detached immutable snapshots with logical values, not the
-library's private cache envelope. The test cache is not a Redis or full cache-manager emulator;
-backend-specific behavior belongs in compatibility tests. Cache keys and inspection records can
-still contain test data, so do not place credentials or other sensitive values in them.
+## Backends and compatibility
 
-## Requirements
+The default NestJS cache-manager store is supported. Redis is verified with the official
+Keyv adapter configured by the application:
 
-- Node.js 20.19.0 or later
-- pnpm 12.3.4
-- GNU Make
+```ts
+import { CacheModule } from '@nestjs/cache-manager';
+import { createKeyv } from '@keyv/redis';
+
+CacheModule.register({
+  isGlobal: true,
+  stores: [createKeyv('redis://127.0.0.1:6379')],
+});
+```
+
+The backend contract was last verified on 2026-09-12:
+
+| Node       | NestJS | `@nestjs/cache-manager` | `cache-manager` | Keyv  | `@keyv/redis` |
+| ---------- | ------ | ----------------------- | --------------- | ----- | ------------- |
+| 20, 22, 24 | 11.2.3 | 3.1.3                   | 7.2.9           | 5.6.0 | 5.1.6         |
+| 20, 22, 24 | 12.0.1 | 12.0.0                  | 7.2.9           | 5.6.0 | 5.1.6         |
+
+TTL is passed in milliseconds. Real backend expiration is eventually observable. The
+contract does not certify Redis clusters, sentinel, TLS, administration commands, or every
+Keyv adapter. Connection and retry configuration remain application-owned.
+
+## Limitations
+
+- Only Promise-returning methods can be configured.
+- Cached providers must be singleton-scoped `useClass` providers.
+- Invalidation is exact-key only.
+- Concurrent misses are independent; an earlier read can repopulate stale data after a mutation.
+- Effects are not transaction-aware and cannot be rolled back with a provider transaction.
+- The package has no timeout policy; configure backend timeouts in the application.
+- Values must be supported by the selected cache backend's serialization rules.
+- Cache operations fail open; this does not make backend outages invisible to application monitoring.
+- The proxy is not guaranteed to satisfy `instanceof` the concrete provider and must not be self-injected.
 
 ## Development
 
-The publishable package lives in [`code/`](code/). Root-level commands provide the
-canonical contributor interface:
+The publishable package lives in [`code/`](code/). Install dependencies and run fast checks:
 
 ```sh
 make install
 make check
 ```
 
-Available checks:
-
-- `make format-check`: verifies Prettier formatting for source and Markdown.
-- `make lint`: lints TypeScript and Markdown.
-- `make typecheck`: performs strict TypeScript validation without emitting files.
-- `make test`: runs Vitest tests.
-- `make test-backend`: runs the shared cache contract against the in-memory Keyv store.
-- `make test-backend-redis`: starts a pinned ephemeral Redis container and runs the same
-  contract against `@keyv/redis`; it requires a running Docker daemon.
-- `make test-backend-all`: runs both backend contract configurations.
-- `make test-coverage`: runs Vitest with V8 coverage reporting.
-- `make build`: emits ESM, CommonJS, declarations, and source maps.
-- `make pack-check`: verifies the packed tarball from ESM, CommonJS, and TypeScript consumers.
-
-## Compatibility
-
-The package targets Node.js 20, 22, and 24, plus NestJS 11 and 12. CI executes the
-same cache behavior contract against memory and a pinned Redis/Keyv configuration for
-each NestJS/Node pair. The peer ranges describe supported resolution space; the exact
-versions and known backend differences are maintained in
-[the compatibility guide](docs/compatibility.md).
-
-## Package layout
-
-`code/package.json` is the package manifest. The root `README.md` and `LICENSE` remain
-the documentation sources of truth; packaging copies them temporarily into `code/` so
-the npm tarball contains both files without maintaining duplicates.
+Run `make release-check` before preparing a release. It includes coverage and memory/Redis
+backend contracts; Redis validation requires a running Docker daemon. The command validates
+the package but never publishes, tags, or creates a GitHub release.
 
 - [Architecture](docs/architecture.md)
-- [Implementation iterations](docs/iterations/README.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
