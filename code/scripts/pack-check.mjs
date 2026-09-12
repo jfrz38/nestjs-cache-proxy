@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,14 +15,47 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const packageDirectory = resolve(scriptDirectory, '..');
 const artifactsDirectory = join(packageDirectory, '.artifacts');
+const consumerFixture = join(
+  packageDirectory,
+  'fixtures',
+  'package-consumer',
+  'index.ts',
+);
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const node = process.execPath;
+const maxTarballSize = 1_000_000;
+const requiredFiles = new Set([
+  'LICENSE',
+  'README.md',
+  'package.json',
+  'dist/index.cjs',
+  'dist/index.cjs.map',
+  'dist/index.d.ts',
+  'dist/index.js',
+  'dist/index.js.map',
+  'dist/testing/index.cjs',
+  'dist/testing/index.cjs.map',
+  'dist/testing/index.d.ts',
+  'dist/testing/index.js',
+  'dist/testing/index.js.map',
+]);
+const forbiddenPathPrefixes = [
+  'src/',
+  'tests/',
+  'scripts/',
+  'fixtures/',
+  'docs/',
+  'CHANGELOG.md',
+  'CONTRIBUTING.md',
+  'SECURITY.md',
+];
+const secretPatterns = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u,
+  /(?:npm|github|ghp)_[A-Za-z0-9_-]{20,}/u,
+  /AKIA[0-9A-Z]{16}/u,
+];
 
-/**
- * @param {string} command
- * @param {string[]} args
- * @param {string} cwd
- */
+/** @param {string} command @param {string[]} args @param {string} cwd */
 function run(command, args, cwd) {
   execFileSync(command, args, { cwd, stdio: 'inherit' });
 }
@@ -33,21 +74,68 @@ function runPnpm(args, cwd) {
   run(pnpm, args, cwd);
 }
 
-/** @param {string} cwd */
-function getPackedFileList(cwd) {
-  if (process.platform === 'win32') {
-    return execFileSync(
-      process.env.ComSpec ?? 'cmd.exe',
-      ['/d', '/s', '/c', 'pnpm --reporter silent pack --dry-run --json'],
-      { cwd, encoding: 'utf8' },
-    );
+/** @param {string} path */
+function toTarPath(path) {
+  if (process.platform !== 'win32') {
+    return path;
   }
-
-  return execFileSync(
-    pnpm,
-    ['--reporter', 'silent', 'pack', '--dry-run', '--json'],
-    { cwd, encoding: 'utf8' },
+  return `/${path.slice(0, 1).toLowerCase()}${path.slice(2)}`.replaceAll(
+    '\\',
+    '/',
   );
+}
+
+/** @param {string} cwd */
+function getPackedManifest(cwd) {
+  const output =
+    process.platform === 'win32'
+      ? execFileSync(
+          process.env.ComSpec ?? 'cmd.exe',
+          ['/d', '/s', '/c', 'pnpm --reporter silent pack --dry-run --json'],
+          { cwd, encoding: 'utf8' },
+        )
+      : execFileSync(
+          pnpm,
+          ['--reporter', 'silent', 'pack', '--dry-run', '--json'],
+          {
+            cwd,
+            encoding: 'utf8',
+          },
+        );
+  /** @type {unknown} */
+  const parsed = JSON.parse(output.trim());
+  if (Array.isArray(parsed)) {
+    /** @type {unknown} */
+    const firstManifest = parsed[0];
+    return firstManifest;
+  }
+  return parsed;
+}
+
+/** @param {unknown} value */
+function isRecord(value) {
+  return typeof value === 'object' && value !== null;
+}
+
+/** @param {unknown} manifest */
+function packedPaths(manifest) {
+  if (!isRecord(manifest) || !('files' in manifest)) {
+    throw new Error('pnpm pack --dry-run did not return a file manifest.');
+  }
+  const { files } = manifest;
+  if (!Array.isArray(files)) {
+    throw new Error('pnpm pack --dry-run returned an invalid files field.');
+  }
+  return files.map((file) => {
+    if (typeof file === 'string') {
+      return file;
+    }
+    if (isRecord(file) && 'path' in file) {
+      const { path } = file;
+      return String(path);
+    }
+    throw new Error('pnpm pack --dry-run returned an invalid file entry.');
+  });
 }
 
 /** @param {'module' | 'commonjs'} type */
@@ -65,14 +153,13 @@ async function createConsumer(type) {
           '@nestjs/cache-manager': nestjsCacheManagerVersion,
           '@nestjs/common': nestjsVersion,
           '@nestjs/core': nestjsVersion,
+          cacheable: '2.5.0',
           'cache-manager': cacheManagerVersion,
-          keyv: '^5.5.0',
+          keyv: '5.6.0',
           'nestjs-cache-proxy': `file:${tarball}`,
-          rxjs: '^7.8.2',
+          rxjs: '7.8.2',
         },
-        devDependencies: {
-          '@types/node': '24.10.1',
-        },
+        devDependencies: { '@types/node': '24.10.1' },
         private: true,
         type,
       },
@@ -83,9 +170,81 @@ async function createConsumer(type) {
   return directory;
 }
 
+/** @param {string[]} paths */
+function verifyManifest(paths) {
+  for (const requiredFile of requiredFiles) {
+    if (!paths.includes(requiredFile)) {
+      throw new Error(`Tarball is missing required file: ${requiredFile}`);
+    }
+  }
+  for (const path of paths) {
+    if (
+      forbiddenPathPrefixes.some(
+        (prefix) => path === prefix || path.startsWith(prefix),
+      )
+    ) {
+      throw new Error(`Tarball unexpectedly includes ${path}`);
+    }
+  }
+}
+
+/** @param {string} extractedDirectory */
+async function verifyExtractedPackage(extractedDirectory) {
+  const packageRoot = join(extractedDirectory, 'package');
+  /** @type {unknown} */
+  const packageJson = JSON.parse(
+    await readFile(join(packageRoot, 'package.json'), 'utf8'),
+  );
+  if (!isRecord(packageJson) || packageJson.version !== '0.1.0') {
+    throw new Error('Packaged package.json does not declare version 0.1.0.');
+  }
+  const { exports: packageExports } = packageJson;
+  if (
+    !isRecord(packageExports) ||
+    Object.keys(packageExports).join(',') !== '.,./testing,./package.json'
+  ) {
+    throw new Error(
+      'Tarball exports do not match the public entry-point allowlist.',
+    );
+  }
+
+  const declarationFiles = [
+    join(packageRoot, 'dist', 'index.d.ts'),
+    join(packageRoot, 'dist', 'testing', 'index.d.ts'),
+  ];
+  for (const declarationFile of declarationFiles) {
+    const declaration = await readFile(declarationFile, 'utf8');
+    if (
+      /from ['"]\.\/(?:application|domain|infrastructure)\//u.test(
+        declaration,
+      ) ||
+      /\b(?:CacheAsideExecutor|CachePolicyCompiler|CacheProxyFactory)\b/u.test(
+        declaration,
+      )
+    ) {
+      throw new Error(
+        `Declaration audit found an internal dependency in ${declarationFile}.`,
+      );
+    }
+  }
+
+  const entries = await readdir(packageRoot, { recursive: true });
+  for (const entry of entries) {
+    const path = String(entry);
+    const fullPath = join(packageRoot, path);
+    if ((await stat(fullPath)).isFile()) {
+      const content = await readFile(fullPath, 'utf8');
+      if (secretPatterns.some((pattern) => pattern.test(content))) {
+        throw new Error(`Potential secret found in tarball file: ${path}`);
+      }
+    }
+  }
+}
+
 let tarball = '';
 let esmDirectory = '';
 let cjsDirectory = '';
+let extractedDirectory = '';
 
 try {
   runPnpm(['run', 'build'], packageDirectory);
@@ -98,17 +257,22 @@ try {
     throw new Error('pnpm pack did not produce a tarball.');
   }
   tarball = join(artifactsDirectory, packageFile);
-
-  const packedFileList = getPackedFileList(packageDirectory);
-  for (const forbiddenPath of [
-    '"path": "src/',
-    '"path": "tests/',
-    '"path": "scripts/',
-  ]) {
-    if (packedFileList.includes(forbiddenPath)) {
-      throw new Error(`Tarball unexpectedly includes ${forbiddenPath}`);
-    }
+  if ((await stat(tarball)).size > maxTarballSize) {
+    throw new Error(
+      `Tarball exceeds the ${maxTarballSize}-byte release limit.`,
+    );
   }
+
+  verifyManifest(packedPaths(getPackedManifest(packageDirectory)));
+  extractedDirectory = await mkdtemp(
+    join(tmpdir(), 'nestjs-cache-proxy-tarball-'),
+  );
+  run(
+    'tar',
+    ['-xzf', toTarPath(tarball), '-C', toTarPath(extractedDirectory)],
+    packageDirectory,
+  );
+  await verifyExtractedPackage(extractedDirectory);
 
   esmDirectory = await createConsumer('module');
   cjsDirectory = await createConsumer('commonjs');
@@ -132,17 +296,24 @@ try {
     ],
     cjsDirectory,
   );
-
-  await writeFile(
-    join(esmDirectory, 'index.ts'),
-    "import { CacheProxyModule, cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\nimport { buildPolicyCacheKey, createTestCache, TestCacheOperationType } from 'nestjs-cache-proxy/testing';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\nconst testCache = createTestCache();\nconst key: string = buildPolicyCacheKey({ args: ['1'], namespace: { application: 'consumer', environment: 'test' }, policy, resource: 'byId' });\nconst operationType: TestCacheOperationType = TestCacheOperationType.GET;\nvoid testCache;\nvoid key;\nvoid operationType;\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\nCacheProxyModule.forRoot({ namespace: { application: 'consumer', environment: 'test' } });\nCacheProxyModule.forFeature([{ provide: 'provider', useClass: DefaultProvider, policy }]);\n",
+  run(
+    node,
+    [
+      '--input-type=module',
+      '--eval',
+      "import('nestjs-cache-proxy/dist/index.js').then(() => process.exit(1), (error) => { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') process.exit(1); });",
+    ],
+    esmDirectory,
   );
+
+  await cp(consumerFixture, join(esmDirectory, 'index.ts'));
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(
     node,
     [
       tsc,
       '--noEmit',
+      '--experimentalDecorators',
       '--module',
       'NodeNext',
       '--moduleResolution',
@@ -163,6 +334,9 @@ try {
     cjsDirectory === ''
       ? Promise.resolve()
       : rm(cjsDirectory, { force: true, recursive: true }),
+    extractedDirectory === ''
+      ? Promise.resolve()
+      : rm(extractedDirectory, { force: true, recursive: true }),
     rm(join(packageDirectory, 'LICENSE'), { force: true }),
     rm(join(packageDirectory, 'README.md'), { force: true }),
   ]);

@@ -1,6 +1,7 @@
 import {
   buildCacheKey,
   cachedProvider,
+  CacheProxyModule,
   defineCachePolicy,
   type BuildCacheKeyInput,
   type CacheErrorEvent,
@@ -112,6 +113,64 @@ class DefaultUserRepository extends UserRepository {
     return { id: '1', name: 'Ada' };
   }
 }
+
+abstract class AuthorRepository {
+  public abstract obtainAuthors(): Promise<readonly User[]>;
+  public abstract obtainAuthorById(id: string): Promise<User | null>;
+  public abstract create(name: string): Promise<User>;
+}
+
+class DefaultAuthorRepository extends AuthorRepository {
+  public obtainAuthors(): Promise<readonly User[]> {
+    return Promise.resolve([]);
+  }
+
+  public obtainAuthorById(id: string): Promise<User | null> {
+    return Promise.resolve({ id, name: 'Ada' });
+  }
+
+  public create(name: string): Promise<User> {
+    return Promise.resolve({ id: '1', name });
+  }
+}
+
+const authorPolicy = defineCachePolicy<AuthorRepository>()({
+  resources: {
+    authors: {
+      method: 'obtainAuthors',
+      version: 1,
+      ttl: 60_000,
+      key: () => 'all',
+    },
+    author: {
+      method: 'obtainAuthorById',
+      version: 1,
+      ttl: 60_000,
+      key: ([id]) => id,
+    },
+  },
+  methods: {
+    obtainAuthors: { cache: 'authors' },
+    obtainAuthorById: { cache: 'author' },
+    create: {
+      effects: [{ invalidate: { resource: 'authors' } }],
+    },
+  },
+});
+
+cachedProvider({
+  provide: AuthorRepository,
+  useClass: DefaultAuthorRepository,
+  policy: authorPolicy,
+});
+
+CacheProxyModule.forFeature([
+  {
+    provide: AuthorRepository,
+    useClass: DefaultAuthorRepository,
+    policy: authorPolicy,
+  },
+]);
 
 const provider: CachedProvider<UserRepository> = {
   provide: UserRepository,

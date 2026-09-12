@@ -11,7 +11,7 @@ help: ## Show available targets
 install: ## Install locked dependencies
 	$(PNPM) --dir "$(PACKAGE_DIR)" install --frozen-lockfile
 
-.PHONY: format format-check lint typecheck test test-backend test-backend-redis test-backend-all test-coverage build pack-check
+.PHONY: format format-check lint typecheck test test-backend test-backend-redis test-backend-all test-coverage build pack-check release-check
 format: ## Format source code and documentation
 	$(PNPM) --dir "$(PACKAGE_DIR)" run format
 
@@ -44,6 +44,10 @@ build: ## Build ESM, CommonJS, declarations, and source maps
 
 pack-check: ## Verify the packed tarball with ESM, CommonJS, and TypeScript consumers
 	$(PNPM) --dir "$(PACKAGE_DIR)" run pack:check
+
+.PHONY: release-check
+release-check: ## Run the complete non-publishing release gate, including Redis via Docker
+	$(PNPM) --dir "$(PACKAGE_DIR)" run release:check
 
 .PHONY: check
 check: format-check lint typecheck test build pack-check ## Run all project checks

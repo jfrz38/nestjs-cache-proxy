@@ -8,8 +8,11 @@ export type RuntimeToken<T> =
 
 export type UseClass<T> = new (...args: never[]) => T;
 
-export interface CachedProvider<T> {
+export interface CachedProvider<
+  T,
+  Resources extends Record<string, unknown> = CacheResourceMap<T>,
+> {
   readonly provide: RuntimeToken<T>;
   readonly useClass: UseClass<T>;
-  readonly policy: CachePolicy<T, CacheResourceMap<T>>;
+  readonly policy: CachePolicy<T, Resources>;
 }
