@@ -11,7 +11,7 @@ help: ## Show available targets
 install: ## Install locked dependencies
 	$(PNPM) --dir "$(PACKAGE_DIR)" install --frozen-lockfile
 
-.PHONY: format format-check lint typecheck test test-coverage build pack-check
+.PHONY: format format-check lint typecheck test test-backend test-backend-redis test-backend-all test-coverage build pack-check
 format: ## Format source code and documentation
 	$(PNPM) --dir "$(PACKAGE_DIR)" run format
 
@@ -26,6 +26,15 @@ typecheck: ## Type-check without emitting files
 
 test: ## Run unit tests
 	$(PNPM) --dir "$(PACKAGE_DIR)" run test
+
+test-backend: ## Run the memory backend compatibility contract
+	$(PNPM) --dir "$(PACKAGE_DIR)" run test:backend
+
+test-backend-redis: ## Run the Redis backend compatibility contract with Docker
+	$(PNPM) --dir "$(PACKAGE_DIR)" run test:backend:redis
+
+test-backend-all: ## Run memory and Redis backend compatibility contracts
+	$(PNPM) --dir "$(PACKAGE_DIR)" run test:backend:all
 
 test-coverage: ## Run unit tests with coverage reporting
 	$(PNPM) --dir "$(PACKAGE_DIR)" run test:coverage
