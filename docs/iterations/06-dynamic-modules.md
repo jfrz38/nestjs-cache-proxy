@@ -73,9 +73,8 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 - Tests proving internal tokens cannot be imported as public API.
 - Bootstrap failure tests for missing `CACHE_MANAGER`, invalid options, and local duplicate
   registrations.
-- Architecture-rule tests proving prohibited cross-layer imports fail linting.
-- Architecture-rule tests proving NestJS/backend imports from `runtime`, `key`, or `policy`
-  fail linting.
+- ESLint rejects prohibited cross-layer imports in the project source.
+- ESLint rejects NestJS/backend imports from `runtime`, `key`, or `policy`.
 
 ## Acceptance criteria
 

@@ -5,12 +5,36 @@ import globals from 'globals';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
-import {
-  architectureRuleOptions,
-  coreImportRestrictions,
-} from './architecture-layers.mjs';
 
 const tsconfigRootDir = dirname(fileURLToPath(import.meta.url));
+const architectureRuleOptions = {
+  sourceFolder: 'src',
+  layers: {
+    domain: {
+      aliases: ['key', 'policy'],
+      allowedDependencies: ['domain'],
+    },
+    application: {
+      aliases: ['runtime'],
+      allowedDependencies: ['domain', 'application'],
+    },
+    infrastructure: {
+      aliases: ['nest', '@nestjs', 'cache-manager'],
+      allowedDependencies: ['domain', 'application', 'infrastructure'],
+    },
+  },
+  ignoreTypeImports: false,
+  ignoreExternalDependencies: false,
+};
+const coreImportRestrictions = {
+  patterns: [
+    {
+      group: ['@nestjs/*', 'cache-manager'],
+      message:
+        'Framework and cache backend dependencies belong in the nest layer.',
+    },
+  ],
+};
 
 export default tseslint.config(
   {
