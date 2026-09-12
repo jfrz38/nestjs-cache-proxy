@@ -204,15 +204,21 @@ Available checks:
 - `make lint`: lints TypeScript and Markdown.
 - `make typecheck`: performs strict TypeScript validation without emitting files.
 - `make test`: runs Vitest tests.
+- `make test-backend`: runs the shared cache contract against the in-memory Keyv store.
+- `make test-backend-redis`: starts a pinned ephemeral Redis container and runs the same
+  contract against `@keyv/redis`; it requires a running Docker daemon.
+- `make test-backend-all`: runs both backend contract configurations.
 - `make test-coverage`: runs Vitest with V8 coverage reporting.
 - `make build`: emits ESM, CommonJS, declarations, and source maps.
 - `make pack-check`: verifies the packed tarball from ESM, CommonJS, and TypeScript consumers.
 
 ## Compatibility
 
-The package targets Node.js 20, 22, and 24, plus NestJS 11 and 12. The CI matrix
-validates the declared NestJS, `@nestjs/cache-manager`, and `cache-manager` peer
-combinations through a packed consumer.
+The package targets Node.js 20, 22, and 24, plus NestJS 11 and 12. CI executes the
+same cache behavior contract against memory and a pinned Redis/Keyv configuration for
+each NestJS/Node pair. The peer ranges describe supported resolution space; the exact
+versions and known backend differences are maintained in
+[the compatibility guide](docs/compatibility.md).
 
 ## Package layout
 
