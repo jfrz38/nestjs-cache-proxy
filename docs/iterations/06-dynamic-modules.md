@@ -1,5 +1,9 @@
 # Iteration 06: Dynamic Modules
 
+## Status
+
+Complete
+
 ## Context and motivation
 
 Applications need centralized global cache options and domain-local cached-provider
@@ -24,7 +28,7 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 
 ## Functional scope
 
-- Configure a namespace and minimal error callback globally.
+- Configure a namespace globally. Cache error reporting remains deferred to Iteration 08.
 - Register multiple cached providers in one or several feature modules.
 - Re-export public cached tokens to importing modules.
 - Support a centralized `ApplicationCacheModule` composition pattern.
@@ -34,8 +38,9 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 - Root options token, normalized options provider, and dynamic module metadata.
 - Feature provider flattening and exports.
 - Validation of empty namespace, duplicate feature token, and absent cache manager.
-- Explicit import-order and global-module behavior; avoid making the module global unless
-  a concrete need is demonstrated.
+- `forRoot` makes only the normalized options provider global so child feature modules can retain
+  the `forFeature(registrations)` API. Applications make `CACHE_MANAGER` global through
+  `CacheModule.register({ isGlobal: true })` or an equivalent global application module.
 - Establish the library layer mapping and enable
   `@jfrz38/eslint-plugin-clean-architecture-highlighter` as a local and CI lint gate.
 - Enforce `nest -> runtime -> key / policy`; reject NestJS or backend imports from the core and
@@ -114,7 +119,10 @@ composition, token export rules, and duplicate-registration limitations.
 
 ## Exit evidence
 
-- Multi-module integration report
-- Compiled application composition example
-- Export/provider metadata inspection
-- Bootstrap failure snapshots
+- `make check` verifies the multi-module fixture, root and feature validation, architecture lint
+  rule, package compilation, and documentation formatting.
+- The Nest fixture composes a global application-owned `CacheModule`, one root module, a feature
+  module with class, string, and symbol tokens, and an importing consumer module.
+- Feature metadata inspection verifies that only configured public tokens are exported.
+- Bootstrap validation covers invalid namespaces, duplicate local registrations, and a missing
+  application-owned `CACHE_MANAGER`.
