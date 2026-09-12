@@ -1,5 +1,5 @@
-import type { CacheKey } from '../key/cache-key.js';
-import type { TimeToLive } from '../policy/time-to-live.js';
+import type { CacheKey } from '../../domain/key/cache-key.js';
+import type { TimeToLive } from '../../domain/policy/time-to-live.js';
 
 export interface CacheStore {
   get(key: CacheKey): Promise<unknown>;

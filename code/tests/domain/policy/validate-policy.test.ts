@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { InvalidCachePolicyError } from '../../src/policy/invalid-cache-policy-error.js';
-import { validateCachePolicy } from '../../src/policy/validate-policy.js';
+import { InvalidCachePolicyError } from '../../../src/domain/policy/invalid-cache-policy-error.js';
+import { validateCachePolicy } from '../../../src/domain/policy/validate-policy.js';
 
 const validPolicy = {
   resources: {

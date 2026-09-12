@@ -61,12 +61,12 @@ configured Promise methods and faithfully passes through all other behavior.
 
 ## Expected files and components
 
-- `src/runtime/create-cache-proxy.ts`
-- `src/runtime/execute-cache-aside.ts`
-- `src/runtime/cache-store.port.ts`
-- `src/runtime/compiled-cache-policy.ts`
-- `src/runtime/compiled-read-rule.ts`
-- `src/runtime/compile-cache-policy.ts`
+- `src/application/runtime/create-cache-proxy.ts`
+- `src/application/runtime/execute-cache-aside.ts`
+- `src/application/runtime/cache-store.port.ts`
+- `src/application/runtime/compiled-cache-policy.ts`
+- `src/application/runtime/compiled-read-rule.ts`
+- `src/application/runtime/compile-cache-policy.ts`
 - internal key namespace, resource, version, key, and TTL Value Objects
 - unit fixtures for providers and cache stores
 

@@ -48,9 +48,9 @@ NestJS dynamic modules that consume an application-owned `CACHE_MANAGER`.
 
 ## Expected files and components
 
-- `src/nest/cache-proxy.module.ts`
-- `src/nest/cache-proxy-options.ts`
-- `src/nest/cached-provider.ts`
+- `src/infrastructure/nest/cache-proxy.module.ts`
+- `src/infrastructure/nest/cache-proxy-options.ts`
+- `src/infrastructure/nest/cached-provider.ts`
 - multi-module Nest integration fixtures
 - examples for centralized composition
 

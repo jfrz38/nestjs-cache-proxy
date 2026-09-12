@@ -7,7 +7,7 @@ import {
   InvalidCacheKeyNamespaceError,
   InvalidCacheKeyResourceError,
   InvalidCacheKeyVersionError,
-} from '../../src/index.js';
+} from '../../../src/index.js';
 
 const keyInput = {
   namespace: { application: 'users-api', environment: 'production' },

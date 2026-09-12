@@ -1,4 +1,4 @@
-import { CacheNamespace } from '../key/cache-namespace.js';
+import { CacheNamespace } from '../../domain/key/cache-namespace.js';
 import type { CacheStore } from './cache-store.port.js';
 import type { CompiledReadRule } from './compiled-read-rule.js';
 

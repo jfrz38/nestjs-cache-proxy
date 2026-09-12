@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { CacheKey } from '../../src/key/cache-key.js';
-import { CacheKeyVersion } from '../../src/key/cache-key-version.js';
-import { CacheNamespace } from '../../src/key/cache-namespace.js';
-import { CacheResourceName } from '../../src/key/cache-resource-name.js';
+import { CacheKey } from '../../../src/domain/key/cache-key.js';
+import { CacheKeyVersion } from '../../../src/domain/key/cache-key-version.js';
+import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
+import { CacheResourceName } from '../../../src/domain/key/cache-resource-name.js';
 import {
   InvalidCacheKeyNamespaceError,
   InvalidCacheKeyResourceError,
   InvalidCacheKeyVersionError,
-} from '../../src/key/cache-key-validation-error.js';
+} from '../../../src/domain/key/cache-key-validation-error.js';
 import {
   InvalidTimeToLiveError,
   TimeToLive,
-} from '../../src/policy/time-to-live.js';
+} from '../../../src/domain/policy/time-to-live.js';
 
 describe('internal cache value objects', () => {
   it('accepts valid values without normalizing persisted key components', () => {

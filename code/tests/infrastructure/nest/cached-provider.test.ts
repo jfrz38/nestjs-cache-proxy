@@ -11,8 +11,8 @@ import {
   defineCachePolicy,
   InvalidCachedProviderError,
   InvalidCachePolicyError,
-} from '../../src/index.js';
-import { CACHE_PROXY_OPTIONS } from '../../src/nest/cache-proxy-options.js';
+} from '../../../src/index.js';
+import { CACHE_PROXY_OPTIONS } from '../../../src/infrastructure/nest/cache-proxy-options.js';
 
 interface UserReader {
   findById(id: string): Promise<string>;

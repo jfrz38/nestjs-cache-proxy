@@ -48,11 +48,11 @@ method rules, plus the registration types consumed by later NestJS integration.
 
 ## Expected files and components
 
-- `src/policy/define-cache-policy.ts`
-- `src/policy/policy.types.ts`
-- `src/policy/validate-policy.ts`
-- `src/key/structured-key.types.ts`
-- `src/nest/cached-provider.types.ts`
+- `src/domain/policy/define-cache-policy.ts`
+- `src/domain/policy/policy.types.ts`
+- `src/domain/policy/validate-policy.ts`
+- `src/domain/key/structured-key.types.ts`
+- `src/infrastructure/nest/cached-provider.types.ts`
 - `src/index.ts`
 - `test/types/policy.test-d.ts` or equivalent compile fixtures
 

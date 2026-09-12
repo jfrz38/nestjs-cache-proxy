@@ -1,6 +1,6 @@
 import type { DynamicModule } from '@nestjs/common';
 
-import { CacheNamespace } from '../key/cache-namespace.js';
+import { CacheNamespace } from '../../domain/key/cache-namespace.js';
 import { cachedProvider } from './cached-provider.js';
 import {
   CACHE_PROXY_OPTIONS,

@@ -1,7 +1,7 @@
 import { Scope } from '@nestjs/common';
 import { SCOPE_OPTIONS_METADATA } from '@nestjs/common/constants.js';
 
-import { CachePolicyValidator } from '../policy/cache-policy-validator.js';
+import { CachePolicyValidator } from '../../domain/policy/cache-policy-validator.js';
 import type { CachedProvider } from './cached-provider.types.js';
 import { InvalidCachedProviderError } from './invalid-cached-provider-error.js';
 

@@ -7,25 +7,6 @@ import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
 const tsconfigRootDir = dirname(fileURLToPath(import.meta.url));
-const architectureRuleOptions = {
-  sourceFolder: 'src',
-  layers: {
-    domain: {
-      aliases: ['key', 'policy'],
-      allowedDependencies: ['domain'],
-    },
-    application: {
-      aliases: ['runtime'],
-      allowedDependencies: ['domain', 'application'],
-    },
-    infrastructure: {
-      aliases: ['nest', '@nestjs', 'cache-manager'],
-      allowedDependencies: ['domain', 'application', 'infrastructure'],
-    },
-  },
-  ignoreTypeImports: false,
-  ignoreExternalDependencies: false,
-};
 const coreImportRestrictions = {
   patterns: [
     {
@@ -59,14 +40,11 @@ export default tseslint.config(
       'clean-architecture-highlighter': cleanArchitecture,
     },
     rules: {
-      'clean-architecture-highlighter/no-layer-violation': [
-        'error',
-        architectureRuleOptions,
-      ],
+      'clean-architecture-highlighter/no-layer-violation': 'error',
     },
   },
   {
-    files: ['src/{key,policy,runtime}/**/*.ts'],
+    files: ['src/{domain,application}/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', coreImportRestrictions],
     },

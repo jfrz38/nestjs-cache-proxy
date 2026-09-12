@@ -1,4 +1,4 @@
-import type { CacheKeyNamespace } from '../key/cache-key.types.js';
+import type { CacheKeyNamespace } from '../../domain/key/cache-key.types.js';
 
 export interface CacheProxyOptions {
   readonly namespace: CacheKeyNamespace;

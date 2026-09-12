@@ -781,13 +781,24 @@ The library follows these mandatory design rules:
 The required dependency direction is:
 
 ```text
-nest -> runtime -> key / policy
+infrastructure/nest -> application/runtime -> domain/key / domain/policy
 ```
 
-`key` and `policy` must remain independent of runtime proxying, NestJS, and cache backends.
-`runtime` may depend on `key`, `policy`, and internal ports, but not NestJS. Public exports are
-intentional: internal ports, compiled policy representations, implementation tokens, value
-envelopes, and proxy details do not become consumer API by default.
+```text
+src/
+├── domain/
+│   ├── key/
+│   └── policy/
+├── application/
+│   └── runtime/
+└── infrastructure/
+    └── nest/
+```
+
+`domain/key` and `domain/policy` must remain independent of runtime proxying, NestJS, and cache
+backends. `application/runtime` may depend on the domain and internal ports, but not NestJS.
+Public exports are intentional: internal ports, compiled policy representations, implementation
+tokens, value envelopes, and proxy details do not become consumer API by default.
 
 ---
 
@@ -799,10 +810,11 @@ to enforce their allowed import direction in local linting and CI.
 
 The layer mapping, aliases, and allowed dependencies must be recorded with the source
 structure that introduces them. The tool is not configured before that point: assigning the
-current functional folders to `domain`, `application`, or `infrastructure` without stable
-boundaries would create misleading violations. Activating the rule is a delivery requirement
-of Iteration 06. Its mapping must enforce the documented `nest -> runtime -> key / policy`
-direction, including the prohibition on NestJS or backend imports from the core.
+functional folders to `domain`, `application`, or `infrastructure` without stable boundaries
+would create misleading violations. Activating the rule is a delivery requirement of Iteration
+06. Its mapping must enforce the documented `infrastructure/nest -> application/runtime ->
+domain/key / domain/policy` direction, including the prohibition on NestJS or backend imports
+from the core.
 
 ---
 

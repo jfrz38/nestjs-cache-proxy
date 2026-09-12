@@ -52,10 +52,10 @@ implementation token and NestJS `CACHE_MANAGER`.
 
 ## Expected files and components
 
-- `src/nest/cached-provider.ts`
-- `src/nest/cache-proxy.tokens.ts`
-- `src/nest/cache-proxy-options.ts`
-- `src/nest/validate-registration.ts`
+- `src/infrastructure/nest/cached-provider.ts`
+- `src/infrastructure/nest/cache-proxy.tokens.ts`
+- `src/infrastructure/nest/cache-proxy-options.ts`
+- `src/infrastructure/nest/validate-registration.ts`
 - Nest testing-module fixtures
 
 ## Detailed steps

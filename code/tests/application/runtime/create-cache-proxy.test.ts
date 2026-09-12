@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { CacheNamespace } from '../../src/key/cache-namespace.js';
-import type { CacheStore } from '../../src/runtime/cache-store.port.js';
-import { CachePolicyCompiler } from '../../src/runtime/compile-cache-policy.js';
-import { CacheProxyFactory } from '../../src/runtime/create-cache-proxy.js';
-import { CacheAsideExecutor } from '../../src/runtime/execute-cache-aside.js';
+import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
+import type { CacheStore } from '../../../src/application/runtime/cache-store.port.js';
+import { CachePolicyCompiler } from '../../../src/application/runtime/compile-cache-policy.js';
+import { CacheProxyFactory } from '../../../src/application/runtime/create-cache-proxy.js';
+import { CacheAsideExecutor } from '../../../src/application/runtime/execute-cache-aside.js';
 
 const namespace = { application: 'users-api', environment: 'test' };
 
