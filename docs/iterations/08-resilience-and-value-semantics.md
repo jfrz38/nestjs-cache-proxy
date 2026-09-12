@@ -1,5 +1,9 @@
 # Iteration 08: Resilience and Value Semantics
 
+## Status
+
+Complete
+
 ## Context and motivation
 
 Cache stores disagree on miss representation and serialization details. At the same time,
@@ -25,6 +29,8 @@ minimal safe error-reporting contract.
   cannot change provider behavior.
 - Error events contain operation, resource identifier, and error cause but no raw key,
   args, result, or cached payload.
+- The public error cause is a fresh `CacheOperationError` with a fixed message. The original
+  backend error is deliberately not exposed because it can include raw cache keys or values.
 - The MVP adds no cache-operation timeout; a slow cache can still delay a call.
 
 ## Functional scope
@@ -43,9 +49,10 @@ minimal safe error-reporting contract.
 
 ## Expected files and components
 
-- `src/value/cache-envelope.ts`
+- `src/application/runtime/cache-envelope.ts`
 - `src/application/runtime/cache-operations.ts`
-- `src/errors/cache-error-event.ts`
+- `src/application/runtime/cache-error-event.ts`
+- `src/infrastructure/nest/cache-error-hook-reporter.ts`
 - updates to root options and runtime proxy
 - malformed-store and error-hook fixtures
 
@@ -59,6 +66,20 @@ minimal safe error-reporting contract.
 5. Redact key material and values from events and validation errors.
 6. Apply the wrappers to cache-aside and mutation effects.
 7. Test store-specific miss values and malformed payloads.
+
+## Implementation plan
+
+1. Encode every defined value as `{ marker, version, payload }` and recognize only marker
+   `nestjs-cache-proxy` at envelope version `1`.
+2. Treat backend `undefined` and `null` as misses; report any other non-envelope value as a
+   safe `get` failure without deleting it.
+3. Route all get, set, and delete calls through a runtime operation boundary that owns
+   fail-open handling, envelope conversion, and reporter isolation.
+4. Preserve source-first ordered mutation effects while routing write-through through the
+   same set operation; an `undefined` write-through projection is skipped.
+5. Thread an optional `onCacheError` callback from `forRoot` into the Nest composition root.
+6. Await callback promises only to contain their rejection; callback latency is not bounded
+   in this MVP and callback failures are swallowed.
 
 ## Tests
 
@@ -110,7 +131,12 @@ payload/redaction rules, and lack of timeout protection.
 
 ## Exit evidence
 
-- Value round-trip report
-- Full failure-matrix results
-- Redaction assertions
-- Envelope compatibility fixtures
+- Envelope version `1` round-trips `null`, falsy primitives, objects, and arrays; `undefined`
+  is omitted. Unknown versions, markers, incomplete envelopes, and raw values are malformed
+  cache reads and fall back without cleanup.
+- Runtime and Nest integration tests cover get, set, delete, malformed values, hook rejection,
+  sanitized causes, source error propagation, and `undefined` write-through omission.
+- `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, and
+  `pnpm run pack:check` passed from `code/` on Node 24 and pnpm 12.3.4.
+- `pnpm run format:check` remains red on the pre-existing formatting debt in unchanged files;
+  all files introduced or modified by this iteration were formatted with Prettier.

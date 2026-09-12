@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import type { Cache } from 'cache-manager';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { CacheErrorHook } from '../../../src/index.js';
 import {
   CacheProxyModule,
   defineCachePolicy,
@@ -128,6 +129,47 @@ describe('CacheProxyModule', () => {
         namespace: { application: '', environment: 'test' },
       }),
     ).toThrow('non-empty string');
+  });
+
+  it('reports sanitized cache failures through the root hook', async () => {
+    const onCacheError = vi.fn<CacheErrorHook>();
+    const cache = {
+      get: vi.fn(() => Promise.reject(new Error('failed for raw-key:user-1'))),
+      set: vi.fn(() => Promise.resolve()),
+    } as unknown as Cache;
+
+    @Module({
+      imports: [
+        CacheModule.register({ isGlobal: true }),
+        CacheProxyModule.forRoot({
+          namespace: { application: 'users-api', environment: 'test' },
+          onCacheError,
+        }),
+        CacheProxyModule.forFeature([
+          { provide: ClassReader, useClass: ClassReader, policy },
+        ]),
+      ],
+    })
+    class ApplicationModule {}
+
+    const module = await Test.createTestingModule({
+      imports: [ApplicationModule],
+    })
+      .overrideProvider(CACHE_MANAGER)
+      .useValue(cache)
+      .compile();
+
+    await expect(module.get(ClassReader).findById('1')).resolves.toBe(
+      'class:1',
+    );
+
+    const event = onCacheError.mock.calls[0]![0];
+    expect(event.cause.message).toBe('A cache operation failed.');
+    expect(event.cause.name).toBe('CacheOperationError');
+    expect(event.cause.message).not.toContain('raw-key:user-1');
+    expect(event.operation).toBe('get');
+    expect(event.resource).toBe('userById');
+    await module.close();
   });
 
   it('rejects duplicate public tokens in one feature registration', () => {

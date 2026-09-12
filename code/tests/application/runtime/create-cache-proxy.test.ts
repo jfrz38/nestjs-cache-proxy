@@ -9,6 +9,8 @@ import { CacheAsideExecutor } from '../../../src/application/runtime/execute-cac
 import { CacheEffectsExecutor } from '../../../src/application/runtime/execute-cache-effects.js';
 import { MutationExecutor } from '../../../src/application/runtime/execute-mutation.js';
 import { NoopCacheErrorReporter } from '../../../src/application/runtime/noop-cache-error-reporter.js';
+import { CacheOperations } from '../../../src/application/runtime/cache-operations.js';
+import { CacheEnvelope } from '../../../src/application/runtime/cache-envelope.js';
 
 const namespace = { application: 'users-api', environment: 'test' };
 
@@ -30,12 +32,14 @@ function createProxy<T extends object>(
   policy = createPolicy(),
 ): T {
   return new CacheProxyFactory(
-    new CacheAsideExecutor(cache, CacheNamespace.from(namespace)),
+    new CacheAsideExecutor(
+      new CacheOperations(cache, new NoopCacheErrorReporter()),
+      CacheNamespace.from(namespace),
+    ),
     new MutationExecutor(
       new CacheEffectsExecutor(
-        cache,
+        new CacheOperations(cache, new NoopCacheErrorReporter()),
         CacheNamespace.from(namespace),
-        new NoopCacheErrorReporter(),
       ),
     ),
   ).create(target, policy);
@@ -78,7 +82,9 @@ describe('createCacheProxy', () => {
   });
 
   it('returns a cached hit without invoking the provider', async () => {
-    const cache = createCache(() => Promise.resolve({ id: 'cached' }));
+    const cache = createCache(() =>
+      Promise.resolve(CacheEnvelope.encode({ id: 'cached' })),
+    );
     const findById = vi.fn(() => Promise.resolve({ id: 'provider' }));
     const proxy = createProxy<ReadProvider>({ findById }, cache);
 
@@ -160,10 +166,23 @@ describe('createCacheProxy', () => {
     expect(set).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, null])(
-    'does not cache %s provider results',
+  it('does not cache undefined provider results', async () => {
+    const set = vi.fn(() => Promise.resolve());
+    const findById = vi.fn(() => Promise.resolve(undefined));
+    const proxy = createProxy<ReadProvider>(
+      { findById },
+      createCache(undefined, set),
+    );
+
+    await expect(proxy.findById('user-1')).resolves.toBeUndefined();
+
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it.each([null, false, 0, ''])(
+    'returns and caches %s values through the envelope',
     async (result) => {
-      const set = vi.fn(() => Promise.resolve());
+      const set = vi.fn<CacheStore['set']>(() => Promise.resolve());
       const findById = vi.fn(() => Promise.resolve(result));
       const proxy = createProxy<ReadProvider>(
         { findById },
@@ -172,25 +191,28 @@ describe('createCacheProxy', () => {
 
       await expect(proxy.findById('user-1')).resolves.toBe(result);
 
-      expect(set).not.toHaveBeenCalled();
+      expect(set).toHaveBeenCalledOnce();
+      const [key, cachedValue, ttl] = set.mock.calls[0]!;
+      expect(key.value).toEqual(expect.any(String));
+      expect(cachedValue).toEqual({
+        marker: 'nestjs-cache-proxy',
+        payload: result,
+        version: 1,
+      });
+      expect(ttl.milliseconds).toBe(60_000);
     },
   );
 
-  it.each([false, 0, ''])('returns and caches falsy values', async (result) => {
-    const set = vi.fn<CacheStore['set']>(() => Promise.resolve());
-    const findById = vi.fn(() => Promise.resolve(result));
+  it('returns a cached null without invoking the provider', async () => {
+    const findById = vi.fn(() => Promise.resolve({ id: 'provider' }));
     const proxy = createProxy<ReadProvider>(
       { findById },
-      createCache(undefined, set),
+      createCache(() => Promise.resolve(CacheEnvelope.encode(null))),
     );
 
-    await expect(proxy.findById('user-1')).resolves.toBe(result);
+    await expect(proxy.findById('user-1')).resolves.toBeNull();
 
-    expect(set).toHaveBeenCalledOnce();
-    const [key, cachedValue, ttl] = set.mock.calls[0]!;
-    expect(key.value).toEqual(expect.any(String));
-    expect(cachedValue).toBe(result);
-    expect(ttl.milliseconds).toBe(60_000);
+    expect(findById).not.toHaveBeenCalled();
   });
 
   it('builds and validates the key before accessing the cache or provider', async () => {

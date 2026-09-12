@@ -19,6 +19,8 @@ export type {
 } from './domain/key/cache-key.types.js';
 export type { CacheKeyValidationCode } from './domain/key/cache-key-validation-error.js';
 export type { CacheProxyOptions } from './infrastructure/nest/cache-proxy-options.js';
+export type { CacheErrorEvent } from './application/runtime/cache-error-event.js';
+export type { CacheErrorHook } from './infrastructure/nest/cache-error-hook-reporter.js';
 export type {
   CacheEffect,
   CachePolicy,
