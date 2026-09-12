@@ -3,7 +3,6 @@ import 'reflect-metadata';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Inject, Injectable, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { Cache } from 'cache-manager';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CacheErrorHook } from '../../../src/index.js';
@@ -12,6 +11,10 @@ import {
   defineCachePolicy,
   InvalidCachedProviderError,
 } from '../../../src/index.js';
+import {
+  createTestCache,
+  TestCacheOperationType,
+} from '../../../src/testing/index.js';
 
 interface UserReader {
   findById(id: string): Promise<string>;
@@ -64,20 +67,9 @@ class Consumer {
   ) {}
 }
 
-function createCache(): Cache {
-  const values = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(values.get(key))),
-    set: vi.fn((key: string, value: unknown) => {
-      values.set(key, value);
-      return Promise.resolve();
-    }),
-  } as unknown as Cache;
-}
-
 describe('CacheProxyModule', () => {
   it('composes application-owned cache infrastructure with exported feature tokens', async () => {
-    const cache = createCache();
+    const testCache = createTestCache();
 
     @Module({
       imports: [
@@ -108,7 +100,7 @@ describe('CacheProxyModule', () => {
       imports: [ApplicationCacheModule, ConsumerModule],
     })
       .overrideProvider(CACHE_MANAGER)
-      .useValue(cache)
+      .useValue(testCache.cache)
       .compile();
 
     const consumer = module.get(Consumer);
@@ -118,8 +110,12 @@ describe('CacheProxyModule', () => {
     await expect(consumer.symbolReader.findById('3')).resolves.toBe('symbol:3');
 
     expect(consumer.classReader.calls).toBe(1);
-    expect(cache.get).toHaveBeenCalledTimes(4);
-    expect(module.get(CACHE_MANAGER)).toBe(cache);
+    expect(
+      testCache
+        .operations()
+        .filter((operation) => operation.type === TestCacheOperationType.GET),
+    ).toHaveLength(4);
+    expect(module.get(CACHE_MANAGER)).toBe(testCache.cache);
     await module.close();
   });
 

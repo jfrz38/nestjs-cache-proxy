@@ -105,11 +105,11 @@ use bounded TTLs until post-commit integration exists.
 
 The runtime is composed from `CachePolicyCompiler`, `CacheAsideExecutor`, and
 `CacheProxyFactory`. These framework-independent classes and their value objects are internal;
-NestJS will compose them with a concrete cache adapter in a later iteration.
+NestJS composes them with the application's `CACHE_MANAGER`.
 
-Until the value envelope arrives in the next resilience iteration, `null` and `undefined` from a
-cache store are misses. Provider `null` and `undefined` results are returned but not stored; other
-falsy values such as `false`, `0`, and `''` are cacheable.
+The runtime stores a private value envelope so a cached `null` is a hit. `undefined` from a cache
+store is a miss, and provider `undefined` results are returned but not stored. Other falsy values
+such as `false`, `0`, and `''` are cacheable.
 
 ## Cache Keys
 
@@ -140,6 +140,47 @@ credentials, tokens, or other sensitive values: keys can be visible to cache inf
 Resource versions isolate incompatible entries; a version bump neither migrates nor deletes
 older entries. The `k1` payload is a persistent contract, so future representation changes
 must introduce a new format version.
+
+## Testing
+
+`nestjs-cache-proxy/testing` provides a deterministic in-memory cache for consumer tests. It has
+only the `get`, `set`, and `del` cache-manager operations used by this package, so inject
+`testCache.cache` when overriding the application-owned `CACHE_MANAGER`.
+
+```ts
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import {
+  buildPolicyCacheKey,
+  createTestCache,
+  TestCacheOperationType,
+} from 'nestjs-cache-proxy/testing';
+
+const testCache = createTestCache();
+const module = await Test.createTestingModule({ imports: [ApplicationModule] })
+  .overrideProvider(CACHE_MANAGER)
+  .useValue(testCache.cache)
+  .compile();
+
+const key = buildPolicyCacheKey({
+  args: ['user-1'],
+  namespace: { application: 'users-api', environment: 'test' },
+  policy: userCachePolicy,
+  resource: 'userById',
+});
+
+await testCache.seed(key, { id: 'user-1' }, 60_000);
+testCache.clock.advanceBy(60_000);
+expect(testCache.entries()).toEqual([]);
+expect(testCache.operations()).toContainEqual(
+  expect.objectContaining({ key, type: TestCacheOperationType.GET }),
+);
+```
+
+The manual clock starts at zero, advances only through `advanceBy`, and `reset()` clears entries,
+operations, and time. Inspection returns detached immutable snapshots with logical values, not the
+library's private cache envelope. The test cache is not a Redis or full cache-manager emulator;
+backend-specific behavior belongs in compatibility tests. Cache keys and inspection records can
+still contain test data, so do not place credentials or other sensitive values in them.
 
 ## Requirements
 

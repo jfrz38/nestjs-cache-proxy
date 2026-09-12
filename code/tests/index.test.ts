@@ -60,5 +60,6 @@ describe('package entry point', () => {
   it('exports dynamic modules without exposing internal providers', () => {
     expect(CacheProxyModule).toHaveProperty('forRoot');
     expect(publicApi).not.toHaveProperty('CACHE_PROXY_OPTIONS');
+    expect(publicApi).not.toHaveProperty('createTestCache');
   });
 });

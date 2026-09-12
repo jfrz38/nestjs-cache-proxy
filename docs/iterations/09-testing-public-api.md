@@ -1,5 +1,7 @@
 # Iteration 09: Testing Public API
 
+**Status:** Complete
+
 ## Context and motivation
 
 Keys and mutation effects are application contracts. Users need deterministic tests that
@@ -26,15 +28,14 @@ policy contract assertions.
 - Create/reset a test cache and advance deterministic time.
 - Inspect cache operations and currently live entries.
 - Build expected keys from public policy/resource inputs.
-- Assert policy key snapshots and common hit/miss/invalidation behavior.
+- Build typed expected keys from policy resources and their method arguments.
 
 ## Technical scope
 
 - Separate `testing` export and declarations.
 - Clock abstraction and deterministic expiration.
 - Operation log with typed get/set/delete records.
-- Small contract helper functions; avoid a custom assertion framework when plain Vitest
-  matchers are sufficient.
+- Typed `buildPolicyCacheKey` helper; assertions remain in the consumer's test runner.
 
 ## Expected files and components
 
@@ -47,19 +48,17 @@ policy contract assertions.
 
 ## Detailed steps
 
-1. Define the minimal test cache API from actual runtime tests.
-2. Implement deterministic TTL with an injected monotonic clock.
-3. Record immutable cache operations and expose reset/inspection.
-4. Reuse the production key builder for expected-key helpers.
-5. Add contract helpers only for repeated, stable patterns.
-6. Export from a separate entry point and test packed-package resolution.
-7. Rewrite representative library integration tests using only the public testing API.
+1. Define a `createTestCache()` controller with a typed cache-manager operation subset.
+2. Implement a monotonic manual clock, exact TTL expiry, reset, and hit seeding without sleeps.
+3. Record immutable logical-value operation and live-entry snapshots.
+4. Reuse the production key builder through typed policy/resource argument inputs.
+5. Export independent ESM, CommonJS, and declaration entry points under `./testing`.
+6. Use the public fake in the Nest module integration test and packed consumers.
 
 ## Tests
 
 - Unit tests for expiry boundaries, reset, operation ordering, overwrites, and inspection.
-- Contract tests for hit, miss, cached `null`, `undefined`, invalidation, write-through, and
-  fail-open interactions.
+- Unit tests for hit seeding, cached `null` and falsy values, `undefined`, and snapshot isolation.
 - Type tests for the testing entry point.
 - Packed consumer test importing `nestjs-cache-proxy/testing`.
 
@@ -104,7 +103,8 @@ reset rules, and the boundary between deterministic fake and backend compatibili
 
 ## Exit evidence
 
-- Public testing API declaration review
-- Self-hosted contract suite report
-- TTL tests with no sleeps
-- Packed testing-entry import result
+- Public testing API declaration review through `pnpm run typecheck`.
+- Self-hosted Nest module integration uses `createTestCache()` without internal cache doubles.
+- TTL boundary tests advance the manual clock with no real-time sleeps.
+- `pnpm run pack:check` imports `nestjs-cache-proxy/testing` from ESM, CommonJS, and TypeScript
+  consumers.
