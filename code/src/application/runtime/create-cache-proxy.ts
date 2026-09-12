@@ -1,8 +1,12 @@
 import type { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CacheAsideExecutor } from './execute-cache-aside.js';
+import { MutationExecutor } from './execute-mutation.js';
 
 export class CacheProxyFactory {
-  public constructor(private readonly executor: CacheAsideExecutor) {}
+  public constructor(
+    private readonly cacheAsideExecutor: CacheAsideExecutor,
+    private readonly mutationExecutor: MutationExecutor,
+  ) {}
 
   public create<T extends object>(target: T, policy: CompiledCachePolicy): T {
     const wrappers = new Map<string, (...args: unknown[]) => unknown>();
@@ -25,17 +29,21 @@ export class CacheProxyFactory {
           return existingWrapper;
         }
 
-        const rule = policy.readRuleFor(property);
+        const readRule = policy.readRuleFor(property);
+        const mutationRule = policy.mutationRuleFor(property);
         const wrapper =
-          rule === undefined
+          readRule !== undefined
             ? (...args: unknown[]) =>
-                Reflect.apply(value, target, args) as unknown
-            : (...args: unknown[]) =>
-                this.executor.execute(
-                  rule,
-                  args,
-                  () => Reflect.apply(value, target, args) as unknown,
-                );
+                this.cacheAsideExecutor.execute(readRule, args, () =>
+                  Reflect.apply(value, target, args) as unknown,
+                )
+            : mutationRule !== undefined
+              ? (...args: unknown[]) =>
+                  this.mutationExecutor.execute(mutationRule, args, () =>
+                    Reflect.apply(value, target, args) as unknown,
+                  )
+              : (...args: unknown[]) =>
+                  Reflect.apply(value, target, args) as unknown;
 
         wrappers.set(property, wrapper);
 

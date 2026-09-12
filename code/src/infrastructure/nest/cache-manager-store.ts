@@ -11,6 +11,10 @@ export class CacheManagerStore implements CacheStore {
     return this.cacheManager.get(key.value);
   }
 
+  public async delete(key: CacheKey): Promise<void> {
+    await this.cacheManager.del(key.value);
+  }
+
   public async set(
     key: CacheKey,
     value: unknown,
