@@ -18,14 +18,19 @@ export type CompiledCacheKeyBuilder = (
   result: unknown,
 ) => CacheKey;
 
+export enum CacheEffectKind {
+  INVALIDATE = 'invalidate',
+  WRITE_THROUGH = 'writeThrough',
+}
+
 export interface CompiledInvalidationEffect {
-  readonly kind: 'invalidate';
+  readonly kind: CacheEffectKind.INVALIDATE;
   readonly resource: string;
   readonly buildCacheKey: CompiledCacheKeyBuilder;
 }
 
 export interface CompiledWriteThroughEffect {
-  readonly kind: 'writeThrough';
+  readonly kind: CacheEffectKind.WRITE_THROUGH;
   readonly resource: string;
   readonly buildCacheKey: CompiledCacheKeyBuilder;
   readonly ttl: TimeToLive;
@@ -41,24 +46,27 @@ export interface RuntimeResource {
   readonly version: number;
 }
 
-export interface RuntimeEffectDefinition {
+export interface RuntimeEffectTarget {
   readonly keyArgs?: RuntimeKeyArgsBuilder;
   readonly resource: string;
 }
 
-export interface RuntimeWriteThroughDefinition extends RuntimeEffectDefinition {
+export interface RuntimeWriteThroughTarget extends RuntimeEffectTarget {
   readonly value: (context: RuntimeMutationContext) => unknown;
 }
 
+export interface RuntimeInvalidationEffect {
+  readonly invalidate: RuntimeEffectTarget;
+  readonly writeThrough?: never;
+}
+
+export interface RuntimeWriteThroughEffect {
+  readonly invalidate?: never;
+  readonly writeThrough: RuntimeWriteThroughTarget;
+}
+
 export type RuntimeCacheEffect =
-  | {
-      readonly invalidate: RuntimeEffectDefinition;
-      readonly writeThrough?: never;
-    }
-  | {
-      readonly invalidate?: never;
-      readonly writeThrough: RuntimeWriteThroughDefinition;
-    };
+  RuntimeInvalidationEffect | RuntimeWriteThroughEffect;
 
 export interface RuntimeMethodRule {
   readonly cache?: string;

@@ -5,11 +5,12 @@ import { TimeToLive } from '../../domain/policy/time-to-live.js';
 import { ValidatedCachePolicy } from '../../domain/policy/validated-cache-policy.js';
 import { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CompiledMutationRule } from './compiled-mutation-rule.js';
-import type {
-  CompiledCacheEffect,
-  RuntimeCacheEffect,
-  RuntimePolicy,
-  RuntimeResourceMap,
+import {
+  CacheEffectKind,
+  type CompiledCacheEffect,
+  type RuntimeCacheEffect,
+  type RuntimePolicy,
+  type RuntimeResourceMap,
 } from './compiled-policy.types.js';
 import { CompiledReadRule } from './compiled-read-rule.js';
 
@@ -65,18 +66,18 @@ export class CachePolicyCompiler {
     effect: RuntimeCacheEffect,
     resources: RuntimeResourceMap,
   ): CompiledCacheEffect {
-    const definition = effect.invalidate ?? effect.writeThrough;
-    if (definition === undefined) {
-      throw new Error('Validated cache effect is missing its definition.');
+    const target = effect.invalidate ?? effect.writeThrough;
+    if (target === undefined) {
+      throw new Error('Validated cache effect is missing its target.');
     }
 
-    const resource = resources[definition.resource];
+    const resource = resources[target.resource];
     if (resource === undefined) {
       throw new Error('Validated cache effect references an unknown resource.');
     }
 
     const compiledResource = new CompiledReadRule(
-      CacheResourceName.from(definition.resource),
+      CacheResourceName.from(target.resource),
       CacheKeyVersion.from(resource.version),
       TimeToLive.fromMilliseconds(resource.ttl),
       resource.key,
@@ -86,22 +87,22 @@ export class CachePolicyCompiler {
       args: readonly unknown[],
       result: unknown,
     ) => {
-      const keyArgs = definition.keyArgs?.({ args, result }) ?? [];
+      const keyArgs = target.keyArgs?.({ args, result }) ?? [];
       return compiledResource.buildCacheKey(namespace, keyArgs);
     };
 
     if (effect.invalidate !== undefined) {
       return {
         buildCacheKey,
-        kind: 'invalidate',
-        resource: definition.resource,
+        kind: CacheEffectKind.INVALIDATE,
+        resource: target.resource,
       };
     }
 
     return {
       buildCacheKey,
-      kind: 'writeThrough',
-      resource: definition.resource,
+      kind: CacheEffectKind.WRITE_THROUGH,
+      resource: target.resource,
       ttl: TimeToLive.fromMilliseconds(resource.ttl),
       value: (args, result) => effect.writeThrough.value({ args, result }),
     };

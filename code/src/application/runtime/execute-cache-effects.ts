@@ -1,7 +1,10 @@
 import type { CacheNamespace } from '../../domain/key/cache-namespace.js';
 import type { CacheErrorReporter } from './cache-error-reporter.port.js';
 import type { CacheStore } from './cache-store.port.js';
-import type { CompiledCacheEffect } from './compiled-policy.types.js';
+import {
+  CacheEffectKind,
+  type CompiledCacheEffect,
+} from './compiled-policy.types.js';
 
 export class CacheEffectsExecutor {
   public constructor(
@@ -25,12 +28,13 @@ export class CacheEffectsExecutor {
     args: readonly unknown[],
     result: unknown,
   ): Promise<void> {
-    const operation = effect.kind === 'invalidate' ? 'delete' : 'set';
+    const operation =
+      effect.kind === CacheEffectKind.INVALIDATE ? 'delete' : 'set';
 
     try {
       const key = effect.buildCacheKey(this.namespace, args, result);
 
-      if (effect.kind === 'invalidate') {
+      if (effect.kind === CacheEffectKind.INVALIDATE) {
         await this.cache.delete(key);
       } else {
         await this.cache.set(key, effect.value(args, result), effect.ttl);
