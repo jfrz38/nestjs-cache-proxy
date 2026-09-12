@@ -9,7 +9,7 @@ import type {
   CompiledCacheEffect,
   RuntimeCacheEffect,
   RuntimePolicy,
-  RuntimeResource,
+  RuntimeResourceMap,
 } from './compiled-policy.types.js';
 import { CompiledReadRule } from './compiled-read-rule.js';
 
@@ -63,7 +63,7 @@ export class CachePolicyCompiler {
 
   private compileEffect(
     effect: RuntimeCacheEffect,
-    resources: Record<string, RuntimeResource>,
+    resources: RuntimeResourceMap,
   ): CompiledCacheEffect {
     const definition = effect.invalidate ?? effect.writeThrough;
     if (definition === undefined) {
@@ -103,7 +103,7 @@ export class CachePolicyCompiler {
       kind: 'writeThrough',
       resource: definition.resource,
       ttl: TimeToLive.fromMilliseconds(resource.ttl),
-      value: (args, result) => effect.writeThrough!.value({ args, result }),
+      value: (args, result) => effect.writeThrough.value({ args, result }),
     };
   }
 }

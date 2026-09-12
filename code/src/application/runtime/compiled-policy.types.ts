@@ -3,24 +3,31 @@ import type { CacheKey } from '../../domain/key/cache-key.js';
 import type { CacheNamespace } from '../../domain/key/cache-namespace.js';
 import type { TimeToLive } from '../../domain/policy/time-to-live.js';
 
+export interface RuntimeMutationContext {
+  readonly args: readonly unknown[];
+  readonly result: unknown;
+}
+
+export type RuntimeKeyArgsBuilder = (
+  context: RuntimeMutationContext,
+) => readonly unknown[];
+
+export type CompiledCacheKeyBuilder = (
+  namespace: CacheNamespace,
+  args: readonly unknown[],
+  result: unknown,
+) => CacheKey;
+
 export interface CompiledInvalidationEffect {
   readonly kind: 'invalidate';
   readonly resource: string;
-  readonly buildCacheKey: (
-    namespace: CacheNamespace,
-    args: readonly unknown[],
-    result: unknown,
-  ) => CacheKey;
+  readonly buildCacheKey: CompiledCacheKeyBuilder;
 }
 
 export interface CompiledWriteThroughEffect {
   readonly kind: 'writeThrough';
   readonly resource: string;
-  readonly buildCacheKey: (
-    namespace: CacheNamespace,
-    args: readonly unknown[],
-    result: unknown,
-  ) => CacheKey;
+  readonly buildCacheKey: CompiledCacheKeyBuilder;
   readonly ttl: TimeToLive;
   readonly value: (args: readonly unknown[], result: unknown) => unknown;
 }
@@ -34,34 +41,33 @@ export interface RuntimeResource {
   readonly version: number;
 }
 
-export interface RuntimeCacheEffect {
-  readonly invalidate?: {
-    readonly keyArgs?: (context: {
-      readonly args: readonly unknown[];
-      readonly result: unknown;
-    }) => readonly unknown[];
-    readonly resource: string;
-  };
-  readonly writeThrough?: {
-    readonly keyArgs?: (context: {
-      readonly args: readonly unknown[];
-      readonly result: unknown;
-    }) => readonly unknown[];
-    readonly resource: string;
-    readonly value: (context: {
-      readonly args: readonly unknown[];
-      readonly result: unknown;
-    }) => unknown;
-  };
+export interface RuntimeEffectDefinition {
+  readonly keyArgs?: RuntimeKeyArgsBuilder;
+  readonly resource: string;
 }
 
-export interface RuntimePolicy {
-  readonly resources: Record<string, RuntimeResource>;
-  readonly methods: Record<
-    string,
-    {
-      readonly cache?: string;
-      readonly effects?: readonly RuntimeCacheEffect[];
+export interface RuntimeWriteThroughDefinition extends RuntimeEffectDefinition {
+  readonly value: (context: RuntimeMutationContext) => unknown;
+}
+
+export type RuntimeCacheEffect =
+  | {
+      readonly invalidate: RuntimeEffectDefinition;
+      readonly writeThrough?: never;
     }
-  >;
+  | {
+      readonly invalidate?: never;
+      readonly writeThrough: RuntimeWriteThroughDefinition;
+    };
+
+export interface RuntimeMethodRule {
+  readonly cache?: string;
+  readonly effects?: readonly RuntimeCacheEffect[];
+}
+
+export type RuntimeResourceMap = Record<string, RuntimeResource>;
+
+export interface RuntimePolicy {
+  readonly resources: RuntimeResourceMap;
+  readonly methods: Record<string, RuntimeMethodRule>;
 }

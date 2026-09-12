@@ -75,8 +75,7 @@ export class CacheEffectValidator {
       return false;
     }
 
-    const resource = resources.get(definition.resource);
-    return resource !== undefined && resource.key.length === 0;
+    return resources.hasParameterlessKey(definition.resource);
   }
 
   private invalid(message: string): InvalidCachePolicyError {

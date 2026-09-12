@@ -1,3 +1,7 @@
+type RegisteredCacheResource = {
+  readonly key: (...args: never[]) => unknown;
+};
+
 export class CacheResourceRegistry {
   public constructor(private readonly resources: Record<string, unknown>) {}
 
@@ -5,15 +9,10 @@ export class CacheResourceRegistry {
     return typeof value === 'string' && Object.hasOwn(this.resources, value);
   }
 
-  public get(
-    value: unknown,
-  ): { readonly key: (...args: never[]) => unknown } | undefined {
-    if (!this.has(value)) {
-      return undefined;
-    }
-
-    return this.resources[value] as {
-      readonly key: (...args: never[]) => unknown;
-    };
+  public hasParameterlessKey(value: unknown): boolean {
+    return (
+      this.has(value) &&
+      (this.resources[value] as RegisteredCacheResource).key.length === 0
+    );
   }
 }

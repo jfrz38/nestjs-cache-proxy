@@ -33,6 +33,19 @@ describe('validateCachePolicy', () => {
     expect(() => validateCachePolicy(validPolicy)).not.toThrow();
   });
 
+  it('accepts an omitted key arguments builder for a parameterless resource', () => {
+    expect(() =>
+      validateCachePolicy({
+        ...validPolicy,
+        methods: {
+          update: {
+            effects: [{ invalidate: { resource: 'userById' } }],
+          },
+        },
+      }),
+    ).not.toThrow();
+  });
+
   it.each([
     [
       'an empty resource name',
