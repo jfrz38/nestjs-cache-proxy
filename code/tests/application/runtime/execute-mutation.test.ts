@@ -29,9 +29,7 @@ interface Provider {
   update(id: string, name: string): Promise<User>;
 }
 
-function createCache(
-  overrides: Partial<CacheStore> = {},
-): CacheStore {
+function createCache(overrides: Partial<CacheStore> = {}): CacheStore {
   return {
     delete: () => Promise.resolve(),
     get: () => Promise.resolve(undefined),
@@ -63,7 +61,9 @@ function createPolicy() {
           effects: [
             {
               invalidate: {
-                keyArgs: ({ args }: { readonly args: readonly unknown[] }) => [args[0]],
+                keyArgs: ({ args }: { readonly args: readonly unknown[] }) => [
+                  args[0],
+                ],
                 resource: 'userById',
               },
             },
@@ -162,7 +162,11 @@ describe('mutation cache effects', () => {
     const proxy = new CacheProxyFactory(
       new CacheAsideExecutor(cache, namespace),
       new MutationExecutor(
-        new CacheEffectsExecutor(cache, namespace, new NoopCacheErrorReporter()),
+        new CacheEffectsExecutor(
+          cache,
+          namespace,
+          new NoopCacheErrorReporter(),
+        ),
       ),
     ).create<Provider>(
       {
@@ -203,7 +207,9 @@ describe('mutation cache effects', () => {
 
   it('reports cache failures, continues later effects, and preserves the provider result', async () => {
     const failure = new Error('delete failed');
-    const reporter = { report: vi.fn(() => Promise.reject(new Error('hook failed'))) };
+    const reporter = {
+      report: vi.fn(() => Promise.reject(new Error('hook failed'))),
+    };
     const deleteCache = vi
       .fn<CacheStore['delete']>()
       .mockRejectedValueOnce(failure)
@@ -217,7 +223,11 @@ describe('mutation cache effects', () => {
     });
     const result = { id: 'user-1', name: 'Ada' };
     const proxy = createProxy(
-      { findById: vi.fn(), list: vi.fn(), update: vi.fn(() => Promise.resolve(result)) },
+      {
+        findById: vi.fn(),
+        list: vi.fn(),
+        update: vi.fn(() => Promise.resolve(result)),
+      },
       cache,
       reporter,
     );

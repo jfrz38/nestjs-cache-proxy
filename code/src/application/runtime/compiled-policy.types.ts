@@ -26,8 +26,7 @@ export interface CompiledWriteThroughEffect {
 }
 
 export type CompiledCacheEffect =
-  | CompiledInvalidationEffect
-  | CompiledWriteThroughEffect;
+  CompiledInvalidationEffect | CompiledWriteThroughEffect;
 
 export interface RuntimeResource {
   readonly key: (args: readonly unknown[]) => StructuredKeyInput;
@@ -37,19 +36,22 @@ export interface RuntimeResource {
 
 export interface RuntimeCacheEffect {
   readonly invalidate?: {
-    readonly keyArgs?: (
-      context: { readonly args: readonly unknown[]; readonly result: unknown },
-    ) => readonly unknown[];
+    readonly keyArgs?: (context: {
+      readonly args: readonly unknown[];
+      readonly result: unknown;
+    }) => readonly unknown[];
     readonly resource: string;
   };
   readonly writeThrough?: {
-    readonly keyArgs?: (
-      context: { readonly args: readonly unknown[]; readonly result: unknown },
-    ) => readonly unknown[];
+    readonly keyArgs?: (context: {
+      readonly args: readonly unknown[];
+      readonly result: unknown;
+    }) => readonly unknown[];
     readonly resource: string;
-    readonly value: (
-      context: { readonly args: readonly unknown[]; readonly result: unknown },
-    ) => unknown;
+    readonly value: (context: {
+      readonly args: readonly unknown[];
+      readonly result: unknown;
+    }) => unknown;
   };
 }
 
@@ -57,6 +59,9 @@ export interface RuntimePolicy {
   readonly resources: Record<string, RuntimeResource>;
   readonly methods: Record<
     string,
-    { readonly cache?: string; readonly effects?: readonly RuntimeCacheEffect[] }
+    {
+      readonly cache?: string;
+      readonly effects?: readonly RuntimeCacheEffect[];
+    }
   >;
 }

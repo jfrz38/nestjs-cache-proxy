@@ -40,7 +40,9 @@ export class CacheEffectsExecutor {
     }
   }
 
-  private async report(event: Parameters<CacheErrorReporter['report']>[0]): Promise<void> {
+  private async report(
+    event: Parameters<CacheErrorReporter['report']>[0],
+  ): Promise<void> {
     try {
       await this.reporter.report(event);
     } catch {

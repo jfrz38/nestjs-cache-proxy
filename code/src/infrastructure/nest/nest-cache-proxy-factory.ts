@@ -35,7 +35,11 @@ export class NestCacheProxyFactory {
     const proxy = new CacheProxyFactory(
       new CacheAsideExecutor(cache, namespace),
       new MutationExecutor(
-        new CacheEffectsExecutor(cache, namespace, new NoopCacheErrorReporter()),
+        new CacheEffectsExecutor(
+          cache,
+          namespace,
+          new NoopCacheErrorReporter(),
+        ),
       ),
     ).create(
       implementation,

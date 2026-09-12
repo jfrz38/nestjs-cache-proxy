@@ -34,13 +34,17 @@ export class CacheProxyFactory {
         const wrapper =
           readRule !== undefined
             ? (...args: unknown[]) =>
-                this.cacheAsideExecutor.execute(readRule, args, () =>
-                  Reflect.apply(value, target, args) as unknown,
+                this.cacheAsideExecutor.execute(
+                  readRule,
+                  args,
+                  () => Reflect.apply(value, target, args) as unknown,
                 )
             : mutationRule !== undefined
               ? (...args: unknown[]) =>
-                  this.mutationExecutor.execute(mutationRule, args, () =>
-                    Reflect.apply(value, target, args) as unknown,
+                  this.mutationExecutor.execute(
+                    mutationRule,
+                    args,
+                    () => Reflect.apply(value, target, args) as unknown,
                   )
               : (...args: unknown[]) =>
                   Reflect.apply(value, target, args) as unknown;

@@ -42,24 +42,26 @@ function createProxy<T extends object>(
 }
 
 function createPolicy() {
-  return new CachePolicyCompiler().compile(ValidatedCachePolicy.create({
-    resources: {
-      userById: {
-        method: 'findById',
-        version: 1,
-        ttl: 60_000,
-        key: ([id]: readonly unknown[]) => ({ id: String(id) }),
+  return new CachePolicyCompiler().compile(
+    ValidatedCachePolicy.create({
+      resources: {
+        userById: {
+          method: 'findById',
+          version: 1,
+          ttl: 60_000,
+          key: ([id]: readonly unknown[]) => ({ id: String(id) }),
+        },
       },
-    },
-    methods: {
-      findById: { cache: 'userById' },
-      update: {
-        effects: [
-          { invalidate: { resource: 'userById', keyArgs: () => ['id'] } },
-        ],
+      methods: {
+        findById: { cache: 'userById' },
+        update: {
+          effects: [
+            { invalidate: { resource: 'userById', keyArgs: () => ['id'] } },
+          ],
+        },
       },
-    },
-  }));
+    }),
+  );
 }
 
 describe('createCacheProxy', () => {
@@ -194,17 +196,19 @@ describe('createCacheProxy', () => {
   it('builds and validates the key before accessing the cache or provider', async () => {
     const get = vi.fn(() => Promise.resolve(undefined));
     const findById = vi.fn(() => Promise.resolve({ id: 'user-1' }));
-    const policy = new CachePolicyCompiler().compile(ValidatedCachePolicy.create({
-      resources: {
-        invalid: {
-          method: 'findById',
-          version: 1,
-          ttl: 1,
-          key: () => undefined,
+    const policy = new CachePolicyCompiler().compile(
+      ValidatedCachePolicy.create({
+        resources: {
+          invalid: {
+            method: 'findById',
+            version: 1,
+            ttl: 1,
+            key: () => undefined,
+          },
         },
-      },
-      methods: { findById: { cache: 'invalid' } },
-    }));
+        methods: { findById: { cache: 'invalid' } },
+      }),
+    );
     const proxy = createProxy<ReadProvider>(
       { findById },
       createCache(get),

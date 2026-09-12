@@ -78,17 +78,18 @@ type CacheEffectKeyArgs<
   MutationMethod extends PromiseMethodName<T>,
   Resources,
   Name extends ResourceName<Resources>,
-> = ResourceArgs<T, Resources, Name> extends readonly []
-  ? {
-      readonly keyArgs?: (
-        context: MutationContextFor<T, MutationMethod>,
-      ) => ResourceArgs<T, Resources, Name>;
-    }
-  : {
-      readonly keyArgs: (
-        context: MutationContextFor<T, MutationMethod>,
-      ) => ResourceArgs<T, Resources, Name>;
-    };
+> =
+  ResourceArgs<T, Resources, Name> extends readonly []
+    ? {
+        readonly keyArgs?: (
+          context: MutationContextFor<T, MutationMethod>,
+        ) => ResourceArgs<T, Resources, Name>;
+      }
+    : {
+        readonly keyArgs: (
+          context: MutationContextFor<T, MutationMethod>,
+        ) => ResourceArgs<T, Resources, Name>;
+      };
 
 type MutationContextFor<
   T,
