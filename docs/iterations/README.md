@@ -24,7 +24,7 @@ contract over features that depend on cache-store internals.
 | [04](04-runtime-cache-aside-proxy.md)      | Complete | Implement the framework-independent cache-aside proxy.         |
 | [05](05-nestjs-provider-integration.md)    | Complete | Register singleton `useClass` providers transparently.         |
 | [06](06-dynamic-modules.md)                | Complete | Compose root and feature dynamic modules.                      |
-| [07](07-mutation-cache-effects.md)         | Planned  | Add source-first exact invalidation and write-through.         |
+| [07](07-mutation-cache-effects.md)         | Complete | Add source-first exact invalidation and write-through.         |
 | [08](08-resilience-and-value-semantics.md) | Planned  | Define fail-open behavior and unambiguous cached values.       |
 | [09](09-testing-public-api.md)             | Planned  | Publish deterministic cache contract testing utilities.        |
 | [10](10-backend-compatibility.md)          | Planned  | Verify memory and one Redis/Keyv configuration.                |

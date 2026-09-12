@@ -33,6 +33,19 @@ describe('validateCachePolicy', () => {
     expect(() => validateCachePolicy(validPolicy)).not.toThrow();
   });
 
+  it('accepts an omitted key arguments builder for a parameterless resource', () => {
+    expect(() =>
+      validateCachePolicy({
+        ...validPolicy,
+        methods: {
+          update: {
+            effects: [{ invalidate: { resource: 'userById' } }],
+          },
+        },
+      }),
+    ).not.toThrow();
+  });
+
   it.each([
     [
       'an empty resource name',
@@ -119,6 +132,24 @@ describe('validateCachePolicy', () => {
         },
       },
       'Method "update" effects must declare invalidate or writeThrough.',
+    ],
+    [
+      'an omitted key builder for a dynamic resource',
+      {
+        ...validPolicy,
+        resources: {
+          userById: {
+            ...validPolicy.resources.userById,
+            key: ([id]: readonly unknown[]) => id,
+          },
+        },
+        methods: {
+          update: {
+            effects: [{ invalidate: { resource: 'userById' } }],
+          },
+        },
+      },
+      'Method "update" has an invalid cache effect.',
     ],
   ])(
     'rejects %s with its stable error message',

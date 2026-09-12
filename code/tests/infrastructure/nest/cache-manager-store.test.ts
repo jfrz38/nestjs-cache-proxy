@@ -12,6 +12,7 @@ describe('CacheManagerStore', () => {
   it('maps cache keys and TTLs to cache-manager primitives', async () => {
     const cacheManager = {
       get: vi.fn().mockResolvedValue('cached'),
+      del: vi.fn().mockResolvedValue(undefined),
       set: vi.fn().mockResolvedValue(undefined),
     } as unknown as Cache;
     const key = CacheKey.create({
@@ -27,9 +28,11 @@ describe('CacheManagerStore', () => {
     const store = new CacheManagerStore(cacheManager);
 
     await expect(store.get(key)).resolves.toBe('cached');
+    await store.delete(key);
     await store.set(key, { id: 'user-1' }, ttl);
 
     expect(cacheManager.get).toHaveBeenCalledWith(key.value);
+    expect(cacheManager.del).toHaveBeenCalledWith(key.value);
     expect(cacheManager.set).toHaveBeenCalledWith(
       key.value,
       { id: 'user-1' },

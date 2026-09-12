@@ -3,7 +3,11 @@ import type { Cache } from 'cache-manager';
 import { CacheNamespace } from '../../domain/key/cache-namespace.js';
 import { CachePolicyCompiler } from '../../application/runtime/compile-cache-policy.js';
 import { CacheProxyFactory } from '../../application/runtime/create-cache-proxy.js';
+import { CacheEffectsExecutor } from '../../application/runtime/execute-cache-effects.js';
 import { CacheAsideExecutor } from '../../application/runtime/execute-cache-aside.js';
+import { MutationExecutor } from '../../application/runtime/execute-mutation.js';
+import { NoopCacheErrorReporter } from '../../application/runtime/noop-cache-error-reporter.js';
+import { ValidatedCachePolicy } from '../../domain/policy/validated-cache-policy.js';
 import type { CacheProxyOptions } from './cache-proxy-options.js';
 import { CacheManagerStore } from './cache-manager-store.js';
 
@@ -26,12 +30,21 @@ export class NestCacheProxyFactory {
     options: CacheProxyOptions,
     policy: unknown,
   ): T {
+    const namespace = CacheNamespace.from(options.namespace);
+    const cache = new CacheManagerStore(cacheManager);
     const proxy = new CacheProxyFactory(
-      new CacheAsideExecutor(
-        new CacheManagerStore(cacheManager),
-        CacheNamespace.from(options.namespace),
+      new CacheAsideExecutor(cache, namespace),
+      new MutationExecutor(
+        new CacheEffectsExecutor(
+          cache,
+          namespace,
+          new NoopCacheErrorReporter(),
+        ),
       ),
-    ).create(implementation, this.policyCompiler.compile(policy));
+    ).create(
+      implementation,
+      this.policyCompiler.compile(ValidatedCachePolicy.create(policy)),
+    );
 
     return new Proxy(proxy, {
       get(target, property) {

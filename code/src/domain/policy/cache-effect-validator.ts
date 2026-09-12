@@ -45,7 +45,7 @@ export class CacheEffectValidator {
       !this.isRecord(definition) ||
       !this.hasOnlyFields(definition, definitionFields) ||
       !resources.has(definition.resource) ||
-      typeof definition.keyArgs !== 'function' ||
+      !this.hasValidKeyArgs(definition, resources) ||
       (hasWriteThrough && typeof definition.value !== 'function')
     ) {
       throw this.invalid(`Method "${method}" has an invalid cache effect.`);
@@ -61,6 +61,21 @@ export class CacheEffectValidator {
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private hasValidKeyArgs(
+    definition: Record<string, unknown>,
+    resources: CacheResourceRegistry,
+  ): boolean {
+    if (typeof definition.keyArgs === 'function') {
+      return true;
+    }
+
+    if (definition.keyArgs !== undefined) {
+      return false;
+    }
+
+    return resources.hasParameterlessKey(definition.resource);
   }
 
   private invalid(message: string): InvalidCachePolicyError {

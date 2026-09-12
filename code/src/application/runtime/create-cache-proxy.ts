@@ -1,11 +1,17 @@
 import type { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CacheAsideExecutor } from './execute-cache-aside.js';
+import { MutationExecutor } from './execute-mutation.js';
+
+type ProviderMethod = (...args: unknown[]) => unknown;
 
 export class CacheProxyFactory {
-  public constructor(private readonly executor: CacheAsideExecutor) {}
+  public constructor(
+    private readonly cacheAsideExecutor: CacheAsideExecutor,
+    private readonly mutationExecutor: MutationExecutor,
+  ) {}
 
   public create<T extends object>(target: T, policy: CompiledCachePolicy): T {
-    const wrappers = new Map<string, (...args: unknown[]) => unknown>();
+    const wrappers = new Map<string, ProviderMethod>();
 
     return new Proxy(target, {
       get: (target, property) => {
@@ -15,7 +21,7 @@ export class CacheProxyFactory {
 
         const value: unknown = Reflect.get(target, property, target);
 
-        if (typeof value !== 'function') {
+        if (!this.isProviderMethod(value)) {
           return value;
         }
 
@@ -25,17 +31,12 @@ export class CacheProxyFactory {
           return existingWrapper;
         }
 
-        const rule = policy.readRuleFor(property);
-        const wrapper =
-          rule === undefined
-            ? (...args: unknown[]) =>
-                Reflect.apply(value, target, args) as unknown
-            : (...args: unknown[]) =>
-                this.executor.execute(
-                  rule,
-                  args,
-                  () => Reflect.apply(value, target, args) as unknown,
-                );
+        const wrapper = this.createMethodWrapper(
+          target,
+          value,
+          property,
+          policy,
+        );
 
         wrappers.set(property, wrapper);
 
@@ -45,5 +46,36 @@ export class CacheProxyFactory {
         return Reflect.set(target, property, value, target);
       },
     });
+  }
+
+  private createMethodWrapper(
+    target: object,
+    method: ProviderMethod,
+    property: string,
+    policy: CompiledCachePolicy,
+  ): ProviderMethod {
+    const invoke = (...args: unknown[]): unknown =>
+      Reflect.apply(method, target, args);
+    const readRule = policy.readRuleFor(property);
+
+    if (readRule !== undefined) {
+      return (...args) =>
+        this.cacheAsideExecutor.execute(readRule, args, () => invoke(...args));
+    }
+
+    const mutationRule = policy.mutationRuleFor(property);
+
+    if (mutationRule !== undefined) {
+      return (...args) =>
+        this.mutationExecutor.execute(mutationRule, args, () =>
+          invoke(...args),
+        );
+    }
+
+    return invoke;
+  }
+
+  private isProviderMethod(value: unknown): value is ProviderMethod {
+    return typeof value === 'function';
   }
 }

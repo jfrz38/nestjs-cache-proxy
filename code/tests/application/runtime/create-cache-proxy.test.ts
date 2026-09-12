@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
+import { ValidatedCachePolicy } from '../../../src/domain/policy/validated-cache-policy.js';
 import type { CacheStore } from '../../../src/application/runtime/cache-store.port.js';
 import { CachePolicyCompiler } from '../../../src/application/runtime/compile-cache-policy.js';
 import { CacheProxyFactory } from '../../../src/application/runtime/create-cache-proxy.js';
 import { CacheAsideExecutor } from '../../../src/application/runtime/execute-cache-aside.js';
+import { CacheEffectsExecutor } from '../../../src/application/runtime/execute-cache-effects.js';
+import { MutationExecutor } from '../../../src/application/runtime/execute-mutation.js';
+import { NoopCacheErrorReporter } from '../../../src/application/runtime/noop-cache-error-reporter.js';
 
 const namespace = { application: 'users-api', environment: 'test' };
 
@@ -15,8 +19,9 @@ interface ReadProvider {
 function createCache(
   get: CacheStore['get'] = () => Promise.resolve(undefined),
   set: CacheStore['set'] = () => Promise.resolve(undefined),
+  deleteOperation: CacheStore['delete'] = () => Promise.resolve(),
 ): CacheStore {
-  return { get, set };
+  return { delete: deleteOperation, get, set };
 }
 
 function createProxy<T extends object>(
@@ -26,28 +31,37 @@ function createProxy<T extends object>(
 ): T {
   return new CacheProxyFactory(
     new CacheAsideExecutor(cache, CacheNamespace.from(namespace)),
+    new MutationExecutor(
+      new CacheEffectsExecutor(
+        cache,
+        CacheNamespace.from(namespace),
+        new NoopCacheErrorReporter(),
+      ),
+    ),
   ).create(target, policy);
 }
 
 function createPolicy() {
-  return new CachePolicyCompiler().compile({
-    resources: {
-      userById: {
-        method: 'findById',
-        version: 1,
-        ttl: 60_000,
-        key: ([id]: readonly unknown[]) => ({ id: String(id) }),
+  return new CachePolicyCompiler().compile(
+    ValidatedCachePolicy.create({
+      resources: {
+        userById: {
+          method: 'findById',
+          version: 1,
+          ttl: 60_000,
+          key: ([id]: readonly unknown[]) => ({ id: String(id) }),
+        },
       },
-    },
-    methods: {
-      findById: { cache: 'userById' },
-      update: {
-        effects: [
-          { invalidate: { resource: 'userById', keyArgs: () => ['id'] } },
-        ],
+      methods: {
+        findById: { cache: 'userById' },
+        update: {
+          effects: [
+            { invalidate: { resource: 'userById', keyArgs: () => ['id'] } },
+          ],
+        },
       },
-    },
-  });
+    }),
+  );
 }
 
 describe('createCacheProxy', () => {
@@ -182,17 +196,19 @@ describe('createCacheProxy', () => {
   it('builds and validates the key before accessing the cache or provider', async () => {
     const get = vi.fn(() => Promise.resolve(undefined));
     const findById = vi.fn(() => Promise.resolve({ id: 'user-1' }));
-    const policy = new CachePolicyCompiler().compile({
-      resources: {
-        invalid: {
-          method: 'findById',
-          version: 1,
-          ttl: 1,
-          key: () => undefined,
+    const policy = new CachePolicyCompiler().compile(
+      ValidatedCachePolicy.create({
+        resources: {
+          invalid: {
+            method: 'findById',
+            version: 1,
+            ttl: 1,
+            key: () => undefined,
+          },
         },
-      },
-      methods: { findById: { cache: 'invalid' } },
-    });
+        methods: { findById: { cache: 'invalid' } },
+      }),
+    );
     const proxy = createProxy<ReadProvider>(
       { findById },
       createCache(get),
