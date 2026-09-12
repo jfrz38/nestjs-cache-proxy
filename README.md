@@ -82,16 +82,26 @@ non-empty ordered `effects` list with exact `invalidate` or `writeThrough` effec
 
 ## Runtime Cache-Aside
 
-The internal runtime compiles each policy into immutable read rules and validated value objects for
-the namespace, resource, key version, TTL, and deterministic cache key. The public policy API
-remains a plain object with numeric `version` and `ttl` fields. A configured read builds its key,
-reads the cache, invokes the provider on a miss, awaits a best-effort write, and returns the
-provider result. Cache get and set failures fail open; provider errors propagate unchanged.
+The internal runtime validates each policy once and compiles immutable read and mutation rules with
+validated value objects for the namespace, resource, key version, TTL, and deterministic cache key.
+The public policy API remains a plain object with numeric `version` and `ttl` fields. A configured
+read builds its key, reads the cache, invokes the provider on a miss, awaits a best-effort write,
+and returns the provider result. Cache get and set failures fail open; provider errors propagate
+unchanged.
+
+For a configured mutation, the provider completes first, then exact invalidation and write-through
+effects run in declaration order. Every dynamic target needs `keyArgs({ args, result })`; it may be
+omitted only for a resource whose key builder declares no arguments. Write-through requires an
+explicit canonical `value({ args, result })`. Delete and set failures are reported through an
+internal, non-throwing seam and do not change the provider result. Effects never perform scans,
+prefix deletion, or atomic multi-key operations.
 
 The proxy preserves provider `this` binding, including ECMAScript private fields, and passes
-through properties, symbols, accessors, unconfigured methods, and mutation rules. Wrapper identity
-is stable per string-named method, but the proxy is not guaranteed to satisfy `instanceof` the
-concrete provider class. Concurrent misses are independent; request coalescing is not included.
+through properties, symbols, accessors, and unconfigured methods. Wrapper identity is stable per
+string-named method, but the proxy is not guaranteed to satisfy `instanceof` the concrete provider
+class. Concurrent misses are independent: a read started before a mutation can still repopulate a
+stale entry after its effect completes. Transaction rollback can likewise leave an early effect;
+use bounded TTLs until post-commit integration exists.
 
 The runtime is composed from `CachePolicyCompiler`, `CacheAsideExecutor`, and
 `CacheProxyFactory`. These framework-independent classes and their value objects are internal;

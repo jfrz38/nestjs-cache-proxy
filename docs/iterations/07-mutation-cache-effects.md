@@ -1,5 +1,9 @@
 # Iteration 07: Mutation Cache Effects
 
+## Status
+
+Complete
+
 ## Context and motivation
 
 Cache-aside reads become stale after mutations. Portable correction is possible only when
