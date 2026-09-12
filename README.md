@@ -3,32 +3,58 @@
 Transparent, declarative caching for NestJS providers using DI, proxies, and cache-manager.
 
 The typed cache-policy API, framework-independent runtime cache-aside proxy, and NestJS
-singleton `useClass` provider integration are available.
+dynamic-module provider integration are available.
 
 ## NestJS Providers
 
-`cachedProvider` returns the provider definitions consumed by the upcoming
-`CacheProxyModule.forFeature`. It registers the concrete implementation under an internal
-symbol and publishes its caching proxy under the original token:
+Configure the library once alongside an application-owned global `CacheModule`. `forRoot` only
+normalizes the namespace; it never registers a cache backend. Its global options provider allows
+feature modules to keep the documented `forFeature(registrations)` API:
 
 ```ts
-const providers = cachedProvider({
-  provide: UserRepository,
-  useClass: SqlUserRepository,
-  policy: userCachePolicy,
-});
+@Module({
+  imports: [
+    CacheModule.register({ isGlobal: true }),
+    CacheProxyModule.forRoot({
+      namespace: { application: 'users-api', environment: 'production' },
+    }),
+  ],
+})
+export class ApplicationCacheModule {}
 ```
 
-Public tokens may be classes, abstract classes, strings, or symbols. The implementation must be
-singleton-scoped; request and transient implementations fail before bootstrap. NestJS resolves its
+Feature modules register and export their public cached tokens explicitly:
+
+```ts
+@Module({
+  imports: [
+    CacheProxyModule.forFeature([
+      {
+        provide: UserRepository,
+        useClass: SqlUserRepository,
+        policy: userCachePolicy,
+      },
+    ]),
+  ],
+})
+export class UsersModule {}
+```
+
+`forFeature` delegates each descriptor to `cachedProvider`, which registers the concrete
+implementation under an internal symbol and publishes its caching proxy under the original token.
+Public tokens may be classes, abstract classes, strings, or symbols. Implementations must be
+singleton-scoped; request and transient implementations fail before bootstrap. NestJS resolves
 constructor dependencies normally and invokes lifecycle hooks once on the concrete implementation.
 The public proxy deliberately does not expose lifecycle hooks and is not guaranteed to satisfy
 `instanceof SqlUserRepository`. A direct self-injection through the public token remains a NestJS
 circular dependency.
 
-Applications provide `CACHE_MANAGER` through `CacheModule` and the library root options in the
-next dynamic-module iteration. Duplicate tokens are likewise validated by `forFeature`, not by an
-individual `cachedProvider` descriptor.
+Call `forRoot` once per application context. Duplicate roots and duplicate tokens across separate
+feature modules follow NestJS module-composition semantics and are unsupported; duplicate public
+tokens within one `forFeature` call fail immediately. A feature token is visible only to modules
+that import the feature module. `CacheProxyModule` does not import `CacheModule`: applications must
+make `CACHE_MANAGER` globally available as shown above, or provide it through an equivalent global
+application module.
 
 ## Typed Policies
 

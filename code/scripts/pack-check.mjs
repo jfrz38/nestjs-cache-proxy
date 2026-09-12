@@ -120,7 +120,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import { defineCachePolicy } from 'nestjs-cache-proxy'; if (typeof defineCachePolicy !== 'function') process.exit(1);",
+      "import { CacheProxyModule, defineCachePolicy } from 'nestjs-cache-proxy'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function') process.exit(1);",
     ],
     esmDirectory,
   );
@@ -128,14 +128,14 @@ try {
     node,
     [
       '--eval',
-      "const { defineCachePolicy } = require('nestjs-cache-proxy'); if (typeof defineCachePolicy !== 'function') process.exit(1);",
+      "const { CacheProxyModule, defineCachePolicy } = require('nestjs-cache-proxy'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function') process.exit(1);",
     ],
     cjsDirectory,
   );
 
   await writeFile(
     join(esmDirectory, 'index.ts'),
-    "import { cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\n",
+    "import { CacheProxyModule, cachedProvider, defineCachePolicy } from 'nestjs-cache-proxy';\ninterface Provider { findById(id: string): Promise<string>; }\nclass DefaultProvider implements Provider { findById(id: string): Promise<string> { return Promise.resolve(id); } }\nconst policy = defineCachePolicy<Provider>()({ resources: { byId: { method: 'findById', version: 1, ttl: 1, key: ([id]) => id } }, methods: { findById: { cache: 'byId' } } });\ncachedProvider({ provide: 'provider', useClass: DefaultProvider, policy });\nCacheProxyModule.forRoot({ namespace: { application: 'consumer', environment: 'test' } });\nCacheProxyModule.forFeature([{ provide: 'provider', useClass: DefaultProvider, policy }]);\n",
   );
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import * as publicApi from '../src/index.js';
 import {
   buildCacheKey,
+  CacheProxyModule,
   CacheKeyValidationError,
   defineCachePolicy,
   InvalidCacheKeyInputError,
@@ -53,5 +55,10 @@ describe('package entry point', () => {
     expect(InvalidCacheKeyResourceError).toBeTypeOf('function');
     expect(InvalidCacheKeyVersionError).toBeTypeOf('function');
     expect(InvalidCacheKeyInputError).toBeTypeOf('function');
+  });
+
+  it('exports dynamic modules without exposing internal providers', () => {
+    expect(CacheProxyModule).toHaveProperty('forRoot');
+    expect(publicApi).not.toHaveProperty('CACHE_PROXY_OPTIONS');
   });
 });

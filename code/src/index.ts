@@ -10,6 +10,7 @@ export {
 export { InvalidCachePolicyError } from './policy/invalid-cache-policy-error.js';
 export { validateCachePolicy } from './policy/validate-policy.js';
 export { cachedProvider } from './nest/cached-provider.js';
+export { CacheProxyModule } from './nest/cache-proxy.module.js';
 export { InvalidCachedProviderError } from './nest/invalid-cached-provider-error.js';
 export type { StructuredKeyInput } from './key/structured-key.types.js';
 export type {
