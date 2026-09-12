@@ -10,7 +10,7 @@ import {
   CacheProxyModule,
   defineCachePolicy,
   InvalidCachedProviderError,
-} from '../../src/index.js';
+} from '../../../src/index.js';
 
 interface UserReader {
   findById(id: string): Promise<string>;

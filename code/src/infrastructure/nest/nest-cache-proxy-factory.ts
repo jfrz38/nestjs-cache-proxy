@@ -1,9 +1,9 @@
 import type { Cache } from 'cache-manager';
 
-import { CacheNamespace } from '../key/cache-namespace.js';
-import { CachePolicyCompiler } from '../runtime/compile-cache-policy.js';
-import { CacheProxyFactory } from '../runtime/create-cache-proxy.js';
-import { CacheAsideExecutor } from '../runtime/execute-cache-aside.js';
+import { CacheNamespace } from '../../domain/key/cache-namespace.js';
+import { CachePolicyCompiler } from '../../application/runtime/compile-cache-policy.js';
+import { CacheProxyFactory } from '../../application/runtime/create-cache-proxy.js';
+import { CacheAsideExecutor } from '../../application/runtime/execute-cache-aside.js';
 import type { CacheProxyOptions } from './cache-proxy-options.js';
 import { CacheManagerStore } from './cache-manager-store.js';
 

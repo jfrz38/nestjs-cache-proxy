@@ -1,9 +1,9 @@
-import type { StructuredKeyInput } from '../key/structured-key.types.js';
-import { CacheKey } from '../key/cache-key.js';
-import { CacheKeyVersion } from '../key/cache-key-version.js';
-import { CacheNamespace } from '../key/cache-namespace.js';
-import { CacheResourceName } from '../key/cache-resource-name.js';
-import { TimeToLive } from '../policy/time-to-live.js';
+import type { StructuredKeyInput } from '../../domain/key/structured-key.types.js';
+import { CacheKey } from '../../domain/key/cache-key.js';
+import { CacheKeyVersion } from '../../domain/key/cache-key-version.js';
+import { CacheNamespace } from '../../domain/key/cache-namespace.js';
+import { CacheResourceName } from '../../domain/key/cache-resource-name.js';
+import { TimeToLive } from '../../domain/policy/time-to-live.js';
 
 export class CompiledReadRule {
   public constructor(

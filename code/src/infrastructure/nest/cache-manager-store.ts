@@ -1,8 +1,8 @@
 import type { Cache } from 'cache-manager';
 
-import type { CacheStore } from '../runtime/cache-store.port.js';
-import type { CacheKey } from '../key/cache-key.js';
-import type { TimeToLive } from '../policy/time-to-live.js';
+import type { CacheStore } from '../../application/runtime/cache-store.port.js';
+import type { CacheKey } from '../../domain/key/cache-key.js';
+import type { TimeToLive } from '../../domain/policy/time-to-live.js';
 
 export class CacheManagerStore implements CacheStore {
   public constructor(private readonly cacheManager: Cache) {}

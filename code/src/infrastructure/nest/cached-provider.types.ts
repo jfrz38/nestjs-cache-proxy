@@ -1,4 +1,7 @@
-import type { CachePolicy, CacheResourceMap } from '../policy/policy.types.js';
+import type {
+  CachePolicy,
+  CacheResourceMap,
+} from '../../domain/policy/policy.types.js';
 
 export type RuntimeToken<T> =
   (abstract new (...args: never[]) => T) | string | symbol;

@@ -63,12 +63,12 @@ a resource-version bump isolates changed resource semantics but does not migrate
 
 ## Expected files and components
 
-- `src/key/structured-key.types.ts` (introduced in iteration 02; extended only if needed)
-- `src/key/canonicalize-key.ts`
-- `src/key/build-cache-key.ts`
-- `src/key/cache-key-validation-error.ts`
-- `src/key/encode-structured-key-input.ts`
-- `src/policy/validate-ttl.ts`
+- `src/domain/key/structured-key.types.ts` (introduced in iteration 02; extended only if needed)
+- `src/domain/key/canonicalize-key.ts`
+- `src/domain/key/build-cache-key.ts`
+- `src/domain/key/cache-key-validation-error.ts`
+- `src/domain/key/encode-structured-key-input.ts`
+- `src/domain/policy/validate-ttl.ts`
 - key contract fixtures and tests
 
 ## Detailed steps

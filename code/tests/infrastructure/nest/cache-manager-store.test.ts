@@ -1,12 +1,12 @@
 import type { Cache } from 'cache-manager';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CacheKey } from '../../src/key/cache-key.js';
-import { CacheKeyVersion } from '../../src/key/cache-key-version.js';
-import { CacheNamespace } from '../../src/key/cache-namespace.js';
-import { CacheResourceName } from '../../src/key/cache-resource-name.js';
-import { CacheManagerStore } from '../../src/nest/cache-manager-store.js';
-import { TimeToLive } from '../../src/policy/time-to-live.js';
+import { CacheKey } from '../../../src/domain/key/cache-key.js';
+import { CacheKeyVersion } from '../../../src/domain/key/cache-key-version.js';
+import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
+import { CacheResourceName } from '../../../src/domain/key/cache-resource-name.js';
+import { CacheManagerStore } from '../../../src/infrastructure/nest/cache-manager-store.js';
+import { TimeToLive } from '../../../src/domain/policy/time-to-live.js';
 
 describe('CacheManagerStore', () => {
   it('maps cache keys and TTLs to cache-manager primitives', async () => {

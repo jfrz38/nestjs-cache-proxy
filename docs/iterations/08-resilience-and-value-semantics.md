@@ -44,7 +44,7 @@ minimal safe error-reporting contract.
 ## Expected files and components
 
 - `src/value/cache-envelope.ts`
-- `src/runtime/cache-operations.ts`
+- `src/application/runtime/cache-operations.ts`
 - `src/errors/cache-error-event.ts`
 - updates to root options and runtime proxy
 - malformed-store and error-hook fixtures

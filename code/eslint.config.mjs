@@ -11,15 +11,15 @@ const architectureRuleOptions = {
   sourceFolder: 'src',
   layers: {
     domain: {
-      aliases: ['key', 'policy'],
+      aliases: ['domain'],
       allowedDependencies: ['domain'],
     },
     application: {
-      aliases: ['runtime'],
+      aliases: ['application'],
       allowedDependencies: ['domain', 'application'],
     },
     infrastructure: {
-      aliases: ['nest', '@nestjs', 'cache-manager'],
+      aliases: ['infrastructure'],
       allowedDependencies: ['domain', 'application', 'infrastructure'],
     },
   },
@@ -66,7 +66,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/{key,policy,runtime}/**/*.ts'],
+    files: ['src/{domain,application}/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', coreImportRestrictions],
     },

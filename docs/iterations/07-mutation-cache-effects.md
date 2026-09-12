@@ -42,9 +42,9 @@ provider mutations without overstating consistency guarantees.
 
 ## Expected files and components
 
-- `src/runtime/execute-mutation.ts`
-- `src/runtime/execute-cache-effects.ts`
-- `src/runtime/compiled-policy.types.ts`
+- `src/application/runtime/execute-mutation.ts`
+- `src/application/runtime/execute-cache-effects.ts`
+- `src/application/runtime/compiled-policy.types.ts`
 - mutation provider fixtures and ordered cache spy
 
 ## Detailed steps

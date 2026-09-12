@@ -1,8 +1,8 @@
-import type { StructuredKeyInput } from '../key/structured-key.types.js';
-import { CacheKeyVersion } from '../key/cache-key-version.js';
-import { CacheResourceName } from '../key/cache-resource-name.js';
-import { TimeToLive } from '../policy/time-to-live.js';
-import { CachePolicyValidator } from '../policy/cache-policy-validator.js';
+import type { StructuredKeyInput } from '../../domain/key/structured-key.types.js';
+import { CacheKeyVersion } from '../../domain/key/cache-key-version.js';
+import { CacheResourceName } from '../../domain/key/cache-resource-name.js';
+import { TimeToLive } from '../../domain/policy/time-to-live.js';
+import { CachePolicyValidator } from '../../domain/policy/cache-policy-validator.js';
 import { CompiledCachePolicy } from './compiled-cache-policy.js';
 import { CompiledReadRule } from './compiled-read-rule.js';
 
