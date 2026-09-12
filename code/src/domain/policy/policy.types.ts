@@ -73,6 +73,23 @@ export interface MutationContext<Args extends readonly unknown[], Result> {
   readonly result: Result;
 }
 
+type CacheEffectKeyArgs<
+  T,
+  MutationMethod extends PromiseMethodName<T>,
+  Resources,
+  Name extends ResourceName<Resources>,
+> = ResourceArgs<T, Resources, Name> extends readonly []
+  ? {
+      readonly keyArgs?: (
+        context: MutationContextFor<T, MutationMethod>,
+      ) => ResourceArgs<T, Resources, Name>;
+    }
+  : {
+      readonly keyArgs: (
+        context: MutationContextFor<T, MutationMethod>,
+      ) => ResourceArgs<T, Resources, Name>;
+    };
+
 type MutationContextFor<
   T,
   Method extends PromiseMethodName<T>,
@@ -87,21 +104,15 @@ export type CacheEffect<
     | {
         readonly invalidate: {
           readonly resource: Name;
-          readonly keyArgs: (
-            context: MutationContextFor<T, MutationMethod>,
-          ) => ResourceArgs<T, Resources, Name>;
-        };
+        } & CacheEffectKeyArgs<T, MutationMethod, Resources, Name>;
       }
     | {
         readonly writeThrough: {
           readonly resource: Name;
-          readonly keyArgs: (
-            context: MutationContextFor<T, MutationMethod>,
-          ) => ResourceArgs<T, Resources, Name>;
           readonly value: (
             context: MutationContextFor<T, MutationMethod>,
           ) => ResourceResult<T, Resources, Name>;
-        };
+        } & CacheEffectKeyArgs<T, MutationMethod, Resources, Name>;
       };
 }[ResourceName<Resources>];
 

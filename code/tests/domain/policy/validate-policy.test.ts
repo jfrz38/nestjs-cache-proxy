@@ -120,6 +120,24 @@ describe('validateCachePolicy', () => {
       },
       'Method "update" effects must declare invalidate or writeThrough.',
     ],
+    [
+      'an omitted key builder for a dynamic resource',
+      {
+        ...validPolicy,
+        resources: {
+          userById: {
+            ...validPolicy.resources.userById,
+            key: ([id]: readonly unknown[]) => id,
+          },
+        },
+        methods: {
+          update: {
+            effects: [{ invalidate: { resource: 'userById' } }],
+          },
+        },
+      },
+      'Method "update" has an invalid cache effect.',
+    ],
   ])(
     'rejects %s with its stable error message',
     (_scenario, policy, message) => {
