@@ -100,3 +100,78 @@ jobs:
           NESTJS_VERSION: ${{ matrix.nestjs_version }}
           NESTJS_CACHE_MANAGER_VERSION: ${{ matrix.nestjs_cache_manager_version }}
           CACHE_MANAGER_VERSION: ${{ matrix.cache_manager_version }}
+
+  backend-compatibility:
+    name: Node ${{ matrix.node }} / NestJS ${{ matrix.nestjs }} backends
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:8.10.1-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: 20
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 22
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 24
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 20
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - node: 22
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - node: 24
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: code/pnpm-lock.yaml
+      - run: make install
+      - run: >-
+          pnpm --dir code add --save-dev --save-exact
+          @nestjs/cache-manager@${{ matrix.nestjs_cache_manager_version }}
+          @nestjs/common@${{ matrix.nestjs_version }}
+          @nestjs/core@${{ matrix.nestjs_version }}
+          @nestjs/testing@${{ matrix.nestjs_version }}
+          cache-manager@${{ matrix.cache_manager_version }}
+      - run: node --version
+      - run: >-
+          pnpm --dir code list --depth 0
+          @keyv/redis keyv @nestjs/cache-manager @nestjs/common @nestjs/core cache-manager
+      - run: make test-backend
+      - run: pnpm --dir code exec vitest run tests/integration/redis/cache-backend.test.ts
+        env:
+          REDIS_URL: redis://127.0.0.1:6379

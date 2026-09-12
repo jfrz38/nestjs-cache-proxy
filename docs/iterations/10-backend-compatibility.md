@@ -1,5 +1,7 @@
 # Iteration 10: Backend Compatibility
 
+**Status:** Active
+
 ## Context and motivation
 
 Backend independence is a behavioral claim, not an assumption. Memory and distributed
@@ -19,6 +21,9 @@ configuration across supported NestJS and Node majors.
 - Behavioral parity covers library contracts, not every backend administration feature.
 - Redis tests use an ephemeral service/container in CI and must not depend on developer
   machine state.
+- Local Redis tests use a pinned Docker image and always remove their own container.
+- The compatibility matrix runs NestJS 11 and 12 on Node 20, 22, and 24, for six
+  backend-contract jobs.
 - Backend differences that cannot be normalized are documented rather than hidden.
 
 ## Functional scope
@@ -40,6 +45,7 @@ configuration across supported NestJS and Node majors.
 - `test/contract/cache-backend.contract.ts`
 - `test/integration/memory/`
 - `test/integration/redis/`
+- `code/scripts/run-redis-contract.mjs`
 - repository and use-case example fixtures
 - CI Redis service/container configuration
 - compatibility documentation
@@ -54,6 +60,7 @@ configuration across supported NestJS and Node majors.
 6. Exercise provider and use-case composition through real Nest modules.
 7. Populate a matrix of passing combinations and known store differences.
 8. Adjust peer ranges only to the evidence produced.
+9. Record the runtime and dependency versions printed by every compatibility job.
 
 ## Tests
 
@@ -68,6 +75,7 @@ configuration across supported NestJS and Node majors.
 - The same behavioral suite passes against memory and the documented Redis setup.
 - Every claimed NestJS/Node combination has CI evidence.
 - TTL units and miss/value semantics are identical at the library boundary.
+- Local Redis verification requires Docker but never a pre-existing Redis instance.
 - Tests clean up resources and do not require a pre-existing local Redis instance.
 - Documentation includes exact versions, setup, differences, and troubleshooting.
 - Peer dependency ranges do not exceed verified compatibility without explicit rationale.
