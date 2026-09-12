@@ -112,6 +112,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.0.1(supports-color@7.2.0))
+      '@jfrz38/eslint-plugin-clean-architecture-highlighter':
+        specifier: 0.1.1
+        version: 0.1.1(eslint@10.0.1(supports-color@7.2.0))
       '@nestjs/cache-manager':
         specifier: 12.0.0
         version: 12.0.0(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(reflect-metadata@0.2.2)(rxjs@7.8.2))(cache-manager@7.2.9)(keyv@5.6.0)(rxjs@7.8.2)
@@ -410,6 +413,11 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
+
+  '@jfrz38/eslint-plugin-clean-architecture-highlighter@0.1.1':
+    resolution: {integrity: sha512-Qnn40q209bAuAdMzpYJK7MrgUPXJ3aHQrMEwAnbqyxJOxHPdV5GbSjbalijzc2qAux0QRBerOXgPg0bUpBcKCQ==}
+    peerDependencies:
+      eslint: '>=9'
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -2043,6 +2051,10 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@jfrz38/eslint-plugin-clean-architecture-highlighter@0.1.1(eslint@10.0.1(supports-color@7.2.0))':
+    dependencies:
+      eslint: 10.0.1(supports-color@7.2.0)
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
