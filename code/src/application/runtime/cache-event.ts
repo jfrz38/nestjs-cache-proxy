@@ -12,74 +12,23 @@ export enum CacheEventType {
   DELETE_ERROR = 'delete.error',
 }
 
-type CacheGetHitEvent = {
-  readonly operation: 'get';
-  readonly outcome: 'hit';
+type CacheErrorEventType =
+  | CacheEventType.GET_ERROR
+  | CacheEventType.SET_ERROR
+  | CacheEventType.DELETE_ERROR;
+
+type CacheNonErrorEvent = {
   readonly resource: string;
-  readonly type: CacheEventType.GET_HIT;
+  readonly type: Exclude<CacheEventType, CacheErrorEventType>;
 };
 
-type CacheGetMissEvent = {
-  readonly operation: 'get';
-  readonly outcome: 'miss';
-  readonly resource: string;
-  readonly type: CacheEventType.GET_MISS;
-};
-
-type CacheGetErrorEvent = {
+type CacheErrorEvent = {
   readonly cause: Error;
-  readonly operation: 'get';
-  readonly outcome: 'error';
   readonly resource: string;
-  readonly type: CacheEventType.GET_ERROR;
+  readonly type: CacheErrorEventType;
 };
 
-type CacheSetSuccessEvent = {
-  readonly operation: 'set';
-  readonly outcome: 'success';
-  readonly resource: string;
-  readonly type: CacheEventType.SET_SUCCESS;
-};
-
-type CacheSetSkippedEvent = {
-  readonly operation: 'set';
-  readonly outcome: 'skipped';
-  readonly resource: string;
-  readonly type: CacheEventType.SET_SKIPPED;
-};
-
-type CacheSetErrorEvent = {
-  readonly cause: Error;
-  readonly operation: 'set';
-  readonly outcome: 'error';
-  readonly resource: string;
-  readonly type: CacheEventType.SET_ERROR;
-};
-
-type CacheDeleteSuccessEvent = {
-  readonly operation: 'delete';
-  readonly outcome: 'success';
-  readonly resource: string;
-  readonly type: CacheEventType.DELETE_SUCCESS;
-};
-
-type CacheDeleteErrorEvent = {
-  readonly cause: Error;
-  readonly operation: 'delete';
-  readonly outcome: 'error';
-  readonly resource: string;
-  readonly type: CacheEventType.DELETE_ERROR;
-};
-
-export type CacheEvent =
-  | CacheGetHitEvent
-  | CacheGetMissEvent
-  | CacheGetErrorEvent
-  | CacheSetSuccessEvent
-  | CacheSetSkippedEvent
-  | CacheSetErrorEvent
-  | CacheDeleteSuccessEvent
-  | CacheDeleteErrorEvent;
+export type CacheEvent = CacheNonErrorEvent | CacheErrorEvent;
 
 export class CacheOperationError extends Error {
   public constructor() {

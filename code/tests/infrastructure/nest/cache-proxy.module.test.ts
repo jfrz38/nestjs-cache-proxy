@@ -12,6 +12,7 @@ import {
   defineCachePolicy,
   InvalidCachedProviderError,
 } from '../../../src/index.js';
+import { CacheOperationError } from '../../../src/application/runtime/cache-event.js';
 import {
   createTestCache,
   TestCacheOperationType,
@@ -160,17 +161,11 @@ describe('CacheProxyModule', () => {
       'class:1',
     );
 
-    const event = onCacheEvent.mock.calls[0]![0];
-    if (event.type !== CacheEventType.GET_ERROR) {
-      throw new Error('Expected an error cache event.');
-    }
-    expect(event.cause.message).toBe('A cache operation failed.');
-    expect(event.cause.name).toBe('CacheOperationError');
-    expect(event.cause.message).not.toContain('raw-key:user-1');
-    expect(event.operation).toBe('get');
-    expect(event.outcome).toBe('error');
-    expect(event.resource).toBe('userById');
-    expect(event.type).toBe(CacheEventType.GET_ERROR);
+    expect(onCacheEvent.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.GET_ERROR,
+    });
     await module.close();
   });
 

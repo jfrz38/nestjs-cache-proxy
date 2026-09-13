@@ -92,9 +92,6 @@ const cacheKeyInput: BuildCacheKeyInput = {
 
 const cacheKey = buildCacheKey(cacheKeyInput);
 const cacheEventHook: CacheEventHook = (event: CacheEvent) => {
-  const operation: 'delete' | 'get' | 'set' = event.operation;
-  void operation;
-
   if (event.type === CacheEventType.GET_ERROR) {
     const cause: Error = event.cause;
     void cause;

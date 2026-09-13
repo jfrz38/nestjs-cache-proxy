@@ -252,15 +252,11 @@ describe('mutation cache effects', () => {
     expect(deleteCache).toHaveBeenCalledTimes(2);
     expect(setCache).toHaveBeenCalledOnce();
     expect(reporter.report).toHaveBeenCalledTimes(3);
-    const event = reporter.report.mock.calls[0]![0];
-    if (event.type !== CacheEventType.DELETE_ERROR) {
-      throw new Error('Expected an error cache event.');
-    }
-    expect(event.cause).toBeInstanceOf(CacheOperationError);
-    expect(event.operation).toBe('delete');
-    expect(event.outcome).toBe('error');
-    expect(event.resource).toBe('userById');
-    expect(event.type).toBe(CacheEventType.DELETE_ERROR);
+    expect(reporter.report.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.DELETE_ERROR,
+    });
   });
 
   it('applies write-through admission to the target resource arguments and value', async () => {

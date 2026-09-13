@@ -23,8 +23,6 @@ export class CacheOperations {
 
       if (result.state === CacheEnvelopeState.HIT) {
         await this.report({
-          operation: 'get',
-          outcome: 'hit',
           resource,
           type: CacheEventType.GET_HIT,
         });
@@ -32,17 +30,15 @@ export class CacheOperations {
       }
 
       if (result.state === CacheEnvelopeState.MALFORMED) {
-        await this.reportError(resource, 'get');
+        await this.reportError(resource, CacheEventType.GET_ERROR);
       } else {
         await this.report({
-          operation: 'get',
-          outcome: 'miss',
           resource,
           type: CacheEventType.GET_MISS,
         });
       }
     } catch {
-      await this.reportError(resource, 'get');
+      await this.reportError(resource, CacheEventType.GET_ERROR);
     }
 
     return undefined;
@@ -58,8 +54,6 @@ export class CacheOperations {
     try {
       if (shouldStore() !== true) {
         await this.report({
-          operation: 'set',
-          outcome: 'skipped',
           resource,
           type: CacheEventType.SET_SKIPPED,
         });
@@ -69,8 +63,6 @@ export class CacheOperations {
       const envelope = CacheEnvelope.encode(value);
       if (envelope === undefined) {
         await this.report({
-          operation: 'set',
-          outcome: 'skipped',
           resource,
           type: CacheEventType.SET_SKIPPED,
         });
@@ -79,13 +71,11 @@ export class CacheOperations {
 
       await this.cache.set(key, envelope, ttl);
       await this.report({
-        operation: 'set',
-        outcome: 'success',
         resource,
         type: CacheEventType.SET_SUCCESS,
       });
     } catch {
-      await this.reportError(resource, 'set');
+      await this.reportError(resource, CacheEventType.SET_ERROR);
     }
   }
 
@@ -93,50 +83,22 @@ export class CacheOperations {
     try {
       await this.cache.delete(key);
       await this.report({
-        operation: 'delete',
-        outcome: 'success',
         resource,
         type: CacheEventType.DELETE_SUCCESS,
       });
     } catch {
-      await this.reportError(resource, 'delete');
+      await this.reportError(resource, CacheEventType.DELETE_ERROR);
     }
   }
 
   private async reportError(
     resource: string,
-    operation: 'delete' | 'get' | 'set',
+    type:
+      | CacheEventType.DELETE_ERROR
+      | CacheEventType.GET_ERROR
+      | CacheEventType.SET_ERROR,
   ): Promise<void> {
-    const cause = new CacheOperationError();
-
-    switch (operation) {
-      case 'delete':
-        await this.report({
-          cause,
-          operation,
-          outcome: 'error',
-          resource,
-          type: CacheEventType.DELETE_ERROR,
-        });
-        return;
-      case 'get':
-        await this.report({
-          cause,
-          operation,
-          outcome: 'error',
-          resource,
-          type: CacheEventType.GET_ERROR,
-        });
-        return;
-      case 'set':
-        await this.report({
-          cause,
-          operation,
-          outcome: 'error',
-          resource,
-          type: CacheEventType.SET_ERROR,
-        });
-    }
+    await this.report({ cause: new CacheOperationError(), resource, type });
   }
 
   private async report(event: CacheEvent): Promise<void> {

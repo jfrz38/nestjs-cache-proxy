@@ -17,20 +17,17 @@ observe redacted cache operation outcomes without coupling providers to cache in
 - Cache-aside receives the provider method arguments and result. Write-through receives the target
   resource's derived key arguments and projected value.
 - Predicate failures are fail-open: the provider result remains unchanged, no write occurs, and a
-  redacted `set/error` event is emitted.
+  redacted `CacheEventType.SET_ERROR` event is emitted.
 - `onCacheEvent` is a root-only synchronous-or-asynchronous observational hook. Its failures are
   swallowed and do not create recursive events.
-- Events report only a semantic type, operation, outcome, resource, and a fresh sanitized cause
-  on errors. They do not expose keys, arguments, values, payloads, or durations.
+- Events report only a semantic type, resource, and a fresh sanitized cause on errors. They do
+  not expose keys, arguments, values, payloads, or durations.
 - `onCacheError` is replaced directly because no released consumers require compatibility.
 
 ## Event Contract
 
-- `get`: `hit`, `miss`, or `error`
-- `set`: `success`, `skipped`, or `error`
-- `delete`: `success` or `error`
-- `CacheEventType` provides a single discriminant for each combination, such as
-  `CacheEventType.GET_HIT` and `CacheEventType.SET_SKIPPED`.
+- `CacheEventType` is the complete event classification: `GET_HIT`, `GET_MISS`, `GET_ERROR`,
+  `SET_SUCCESS`, `SET_SKIPPED`, `SET_ERROR`, `DELETE_SUCCESS`, and `DELETE_ERROR`.
 
 ## Acceptance Evidence
 

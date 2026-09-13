@@ -112,9 +112,8 @@ const policy = defineCachePolicy<UserRepository>()({
 ```
 
 Use `onCacheEvent` in `forRoot` to observe cache outcomes. `CacheEventType` provides a semantic
-discriminant for each outcome. Events contain only the operation, outcome, resource name, and a
-sanitized cause for errors; they never include keys, arguments, or values. Hook failures are
-ignored.
+discriminant for each outcome. Events contain only a type, resource name, and a sanitized cause
+for errors; they never include keys, arguments, or values. Hook failures are ignored.
 
 ```ts
 CacheProxyModule.forRoot({
