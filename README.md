@@ -92,7 +92,40 @@ export class UsersModule {}
 
 On a miss, the proxy calls the provider and attempts to write the result. Cache reads and
 writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
-strings are cacheable. `undefined` is returned but not stored.
+strings are cacheable. `undefined` is returned but not stored. A resource can further control
+admission with `cacheIf`; only a `true` result stores the value, and a skipped write preserves
+any existing entry.
+
+```ts
+const policy = defineCachePolicy<UserRepository>()({
+  resources: {
+    userById: {
+      method: 'findById',
+      version: 1,
+      ttl: 300_000,
+      key: ([id]) => id,
+      cacheIf: ({ result }) => result !== null,
+    },
+  },
+  methods: { findById: { cache: 'userById' } },
+});
+```
+
+Use `onCacheEvent` in `forRoot` to observe cache outcomes. `CacheEventType` provides a semantic
+discriminant for each outcome. Events contain only the operation, outcome, resource name, and a
+sanitized cause for errors; they never include keys, arguments, or values. Hook failures are
+ignored.
+
+```ts
+CacheProxyModule.forRoot({
+  namespace: { application: 'users-api', environment: 'production' },
+  onCacheEvent: (event) => {
+    if (event.type === CacheEventType.GET_HIT) {
+      logger.debug(`Cache hit for ${event.resource}`);
+    }
+  },
+});
+```
 
 ## Mutations
 

@@ -48,6 +48,16 @@ describe('validateCachePolicy', () => {
 
   it.each([
     [
+      'a non-function cache admission predicate',
+      {
+        ...validPolicy,
+        resources: {
+          userById: { ...validPolicy.resources.userById, cacheIf: true },
+        },
+      },
+      'Resource "userById" must declare a cache admission predicate.',
+    ],
+    [
       'an empty resource name',
       { ...validPolicy, resources: { '': validPolicy.resources.userById } },
       'Resource names must not be empty.',

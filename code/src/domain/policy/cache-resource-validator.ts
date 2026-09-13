@@ -3,7 +3,13 @@ import { InvalidCachePolicyError } from './invalid-cache-policy-error.js';
 import { TimeToLive } from './time-to-live.js';
 
 export class CacheResourceValidator {
-  private static readonly fields = new Set(['key', 'method', 'ttl', 'version']);
+  private static readonly fields = new Set([
+    'cacheIf',
+    'key',
+    'method',
+    'ttl',
+    'version',
+  ]);
 
   public validate(name: string, resource: unknown): void {
     if (name.trim().length === 0) {
@@ -39,6 +45,15 @@ export class CacheResourceValidator {
 
     if (typeof resource.key !== 'function') {
       throw this.invalid(`Resource "${name}" must declare a key builder.`);
+    }
+
+    if (
+      resource.cacheIf !== undefined &&
+      typeof resource.cacheIf !== 'function'
+    ) {
+      throw this.invalid(
+        `Resource "${name}" must declare a cache admission predicate.`,
+      );
     }
   }
 

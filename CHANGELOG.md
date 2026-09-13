@@ -2,10 +2,13 @@
 
 All notable changes to this project are documented here.
 
-## 0.1.0 - 2026-09-12
+## Unreleased
 
-Initial MVP release candidate.
-
+- Added resource-level `cacheIf({ args, result })` admission predicates for cache-aside and
+  write-through writes. Skipped admissions preserve existing entries.
+- Replaced `onCacheError` with redacted `onCacheEvent`, reporting get/set/delete outcomes while
+  preserving fail-open provider behavior.
+- Added `CacheEventType` for semantic cache-event outcome matching.
 - Typed cache policies, deterministic versioned keys, cache-aside reads, exact invalidation,
   and write-through effects.
 - NestJS dynamic-module composition for singleton `useClass` providers and a public testing

@@ -10,7 +10,7 @@ import { CacheOperations } from '../../application/runtime/cache-operations.js';
 import { ValidatedCachePolicy } from '../../domain/policy/validated-cache-policy.js';
 import type { CacheProxyOptions } from './cache-proxy-options.js';
 import { CacheManagerStore } from './cache-manager-store.js';
-import { CacheErrorHookReporter } from './cache-error-hook-reporter.js';
+import { CacheEventHookReporter } from './cache-event-hook-reporter.js';
 
 export class NestCacheProxyFactory {
   private static readonly lifecycleHooks = new Set([
@@ -35,7 +35,7 @@ export class NestCacheProxyFactory {
     const cache = new CacheManagerStore(cacheManager);
     const operations = new CacheOperations(
       cache,
-      new CacheErrorHookReporter(options.onCacheError),
+      new CacheEventHookReporter(options.onCacheEvent),
     );
     const proxy = new CacheProxyFactory(
       new CacheAsideExecutor(operations, namespace),
