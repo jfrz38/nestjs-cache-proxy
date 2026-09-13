@@ -142,22 +142,16 @@ describe('CacheOperations', () => {
       resource: 'userById',
       type: CacheEventType.SET_SKIPPED,
     });
-    expect(reporter.report).toHaveBeenNthCalledWith(
-      2,
-      {
-        cause: new CacheOperationError(),
-        resource: 'userById',
-        type: CacheEventType.SET_ERROR,
-      },
-    );
-    expect(reporter.report).toHaveBeenNthCalledWith(
-      3,
-      {
-        cause: new CacheOperationError(),
-        resource: 'userById',
-        type: CacheEventType.DELETE_ERROR,
-      },
-    );
+    expect(reporter.report).toHaveBeenNthCalledWith(2, {
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.SET_ERROR,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(3, {
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.DELETE_ERROR,
+    });
   });
 
   it('emits successful hit, miss, set, and delete outcomes', async () => {
