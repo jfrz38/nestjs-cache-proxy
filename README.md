@@ -92,7 +92,39 @@ export class UsersModule {}
 
 On a miss, the proxy calls the provider and attempts to write the result. Cache reads and
 writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
-strings are cacheable. `undefined` is returned but not stored.
+strings are cacheable. `undefined` is returned but not stored. A resource can further control
+admission with `cacheIf`; only a `true` result stores the value, and a skipped write preserves
+any existing entry.
+
+```ts
+const policy = defineCachePolicy<UserRepository>()({
+  resources: {
+    userById: {
+      method: 'findById',
+      version: 1,
+      ttl: 300_000,
+      key: ([id]) => id,
+      cacheIf: ({ result }) => result !== null,
+    },
+  },
+  methods: { findById: { cache: 'userById' } },
+});
+```
+
+Use `onCacheEvent` in `forRoot` to observe cache outcomes. `CacheEventType` provides a semantic
+discriminant for each outcome. Events contain only a type, resource name, and a sanitized cause
+for errors; they never include keys, arguments, or values. Hook failures are ignored.
+
+```ts
+CacheProxyModule.forRoot({
+  namespace: { application: 'users-api', environment: 'production' },
+  onCacheEvent: (event) => {
+    if (event.type === CacheEventType.GET_HIT) {
+      logger.debug(`Cache hit for ${event.resource}`);
+    }
+  },
+});
+```
 
 ## Mutations
 
@@ -188,6 +220,35 @@ The publishable package lives in [`code/`](code/). Install dependencies and run 
 make install
 make check
 ```
+
+Build a local package tarball and install that exact artifact in another project:
+
+```sh
+make pack-local
+pnpm add --force "$(pwd)/code/.artifacts/"*.tgz
+```
+
+From the consumer project, remove and reinstall the package to force pnpm to read the
+fresh tarball when its version has not changed:
+
+```sh
+pnpm remove nestjs-cache-proxy
+pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
+```
+
+The target builds the package first, removes older local tarballs, and writes the new
+artifact to `code/.artifacts/`. Removing the dependency before `pnpm add --force` ensures
+the changed declarations are picked up even when its package version has not changed.
+If the consumer still resolves an older declaration, remove the package's virtual-store
+directory before adding it again:
+
+```sh
+rm -rf node_modules/.pnpm/nestjs-cache-proxy@*
+pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
+```
+
+This validates the packaged output without creating a symlink or publishing a release.
+For editable development, use `pnpm link` instead.
 
 Run `make release-check` before preparing a release. It includes coverage and memory/Redis
 backend contracts; Redis validation requires a running Docker daemon. The command validates

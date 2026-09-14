@@ -38,6 +38,7 @@ export class CachePolicyCompiler {
           CacheKeyVersion.from(resource.version),
           TimeToLive.fromMilliseconds(resource.ttl),
           resource.key,
+          resource.cacheIf,
         ),
       );
 
@@ -81,6 +82,7 @@ export class CachePolicyCompiler {
       CacheKeyVersion.from(resource.version),
       TimeToLive.fromMilliseconds(resource.ttl),
       resource.key,
+      resource.cacheIf,
     );
     const buildCacheKey = (
       namespace: CacheNamespace,
@@ -88,7 +90,10 @@ export class CachePolicyCompiler {
       result: unknown,
     ) => {
       const keyArgs = target.keyArgs?.({ args, result }) ?? [];
-      return compiledResource.buildCacheKey(namespace, keyArgs);
+      return {
+        args: keyArgs,
+        key: compiledResource.buildCacheKey(namespace, keyArgs),
+      };
     };
 
     if (effect.invalidate !== undefined) {
@@ -105,6 +110,7 @@ export class CachePolicyCompiler {
       resource: target.resource,
       ttl: TimeToLive.fromMilliseconds(resource.ttl),
       value: (args, result) => effect.writeThrough.value({ args, result }),
+      shouldCache: (args, result) => compiledResource.shouldCache(args, result),
     };
   }
 }

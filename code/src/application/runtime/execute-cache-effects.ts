@@ -27,16 +27,18 @@ export class CacheEffectsExecutor {
     result: unknown,
   ): Promise<void> {
     try {
-      const key = effect.buildCacheKey(this.namespace, args, result);
+      const target = effect.buildCacheKey(this.namespace, args, result);
 
       if (effect.kind === CacheEffectKind.INVALIDATE) {
-        await this.cache.delete(effect.resource, key);
+        await this.cache.delete(effect.resource, target.key);
       } else {
+        const value = effect.value(args, result);
         await this.cache.set(
           effect.resource,
-          key,
-          effect.value(args, result),
+          target.key,
+          value,
           effect.ttl,
+          () => effect.shouldCache(target.args, value),
         );
       }
     } catch {

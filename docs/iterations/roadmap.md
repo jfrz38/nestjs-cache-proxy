@@ -85,15 +85,15 @@ resource compatibility rules.
 
 ## 7. Metrics, events, and OpenTelemetry
 
-**Rationale:** provides hit rate, latency, errors, and operation traces beyond the minimal
-MVP error hook.
+**Rationale:** provides metrics, latency, and operation traces beyond the minimal cache-event
+hook, which already reports redacted get/set/delete outcomes.
 
 **Dependencies:** stable event taxonomy, cardinality controls, redaction, optional peers,
 and near-zero disabled overhead.
 
 **Risks:** raw key leakage, high-cardinality costs, and framework coupling.
 
-**Status:** requires further study.
+**Status:** minimal events implemented; metrics and OpenTelemetry require further study.
 
 ## 8. Explicit cache bypass context
 

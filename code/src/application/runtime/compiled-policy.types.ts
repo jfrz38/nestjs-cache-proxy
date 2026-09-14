@@ -16,7 +16,7 @@ export type CompiledCacheKeyBuilder = (
   namespace: CacheNamespace,
   args: readonly unknown[],
   result: unknown,
-) => CacheKey;
+) => { readonly args: readonly unknown[]; readonly key: CacheKey };
 
 export enum CacheEffectKind {
   INVALIDATE = 'invalidate',
@@ -35,12 +35,14 @@ export interface CompiledWriteThroughEffect {
   readonly buildCacheKey: CompiledCacheKeyBuilder;
   readonly ttl: TimeToLive;
   readonly value: (args: readonly unknown[], result: unknown) => unknown;
+  readonly shouldCache: (args: readonly unknown[], result: unknown) => boolean;
 }
 
 export type CompiledCacheEffect =
   CompiledInvalidationEffect | CompiledWriteThroughEffect;
 
 export interface RuntimeResource {
+  readonly cacheIf?: (context: RuntimeMutationContext) => boolean;
   readonly key: (args: readonly unknown[]) => StructuredKeyInput;
   readonly ttl: number;
   readonly version: number;

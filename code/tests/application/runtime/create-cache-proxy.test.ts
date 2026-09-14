@@ -8,7 +8,7 @@ import { CacheProxyFactory } from '../../../src/application/runtime/create-cache
 import { CacheAsideExecutor } from '../../../src/application/runtime/execute-cache-aside.js';
 import { CacheEffectsExecutor } from '../../../src/application/runtime/execute-cache-effects.js';
 import { MutationExecutor } from '../../../src/application/runtime/execute-mutation.js';
-import { NoopCacheErrorReporter } from '../../../src/application/runtime/noop-cache-error-reporter.js';
+import { NoopCacheEventReporter } from '../../../src/application/runtime/noop-cache-event-reporter.js';
 import { CacheOperations } from '../../../src/application/runtime/cache-operations.js';
 import { CacheEnvelope } from '../../../src/application/runtime/cache-envelope.js';
 
@@ -33,12 +33,12 @@ function createProxy<T extends object>(
 ): T {
   return new CacheProxyFactory(
     new CacheAsideExecutor(
-      new CacheOperations(cache, new NoopCacheErrorReporter()),
+      new CacheOperations(cache, new NoopCacheEventReporter()),
       CacheNamespace.from(namespace),
     ),
     new MutationExecutor(
       new CacheEffectsExecutor(
-        new CacheOperations(cache, new NoopCacheErrorReporter()),
+        new CacheOperations(cache, new NoopCacheEventReporter()),
         CacheNamespace.from(namespace),
       ),
     ),
@@ -175,6 +175,37 @@ describe('createCacheProxy', () => {
     );
 
     await expect(proxy.findById('user-1')).resolves.toBeUndefined();
+
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('does not cache a wrapped missing value when its resource rejects admission', async () => {
+    const set = vi.fn(() => Promise.resolve());
+    const findById = vi.fn(() => Promise.resolve({ author: undefined }));
+    const policy = new CachePolicyCompiler().compile(
+      ValidatedCachePolicy.create({
+        resources: {
+          userById: {
+            cacheIf: ({ result }: { readonly result: { author?: string } }) =>
+              result.author !== undefined,
+            method: 'findById',
+            version: 1,
+            ttl: 60_000,
+            key: ([id]: readonly unknown[]) => ({ id: String(id) }),
+          },
+        },
+        methods: { findById: { cache: 'userById' } },
+      }),
+    );
+    const proxy = createProxy<ReadProvider>(
+      { findById },
+      createCache(undefined, set),
+      policy,
+    );
+
+    await expect(proxy.findById('user-1')).resolves.toEqual({
+      author: undefined,
+    });
 
     expect(set).not.toHaveBeenCalled();
   });

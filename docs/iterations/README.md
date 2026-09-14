@@ -29,6 +29,7 @@ contract over features that depend on cache-store internals.
 | [09](09-testing-public-api.md)             | Complete | Publish deterministic cache contract testing utilities.        |
 | [10](10-backend-compatibility.md)          | Complete | Verify memory and one Redis/Keyv configuration.                |
 | [11](11-release-readiness.md)              | Complete | Complete packaging, documentation, and release evidence.       |
+| [12](12-cache-admission-and-events.md)     | Complete | Control cache admission and observe redacted operation events. |
 
 Post-MVP candidates are ordered in the [roadmap](roadmap.md). Their APIs are deliberately
 not designed by this plan.
@@ -64,7 +65,7 @@ An iteration is complete only when:
 | Source-first mutation effects                                  | 07                  |
 | Miss, `null`, falsy values, and `undefined`                    | 08                  |
 | Fail-open cache operations and provider error propagation      | 04, 08              |
-| Minimal safe cache error reporting                             | 08                  |
+| Cache admission and minimal safe cache events                  | 08, 12              |
 | `CACHE_MANAGER` integration and centralized composition        | 05, 06              |
 | Static clean-architecture dependency validation                | 06                  |
 | Contract testing utilities                                     | 03, 09              |

@@ -58,8 +58,8 @@ export class CacheProxyModule {
       },
     };
 
-    if (options.onCacheError !== undefined) {
-      return { ...normalizedOptions, onCacheError: options.onCacheError };
+    if (options.onCacheEvent !== undefined) {
+      return { ...normalizedOptions, onCacheEvent: options.onCacheEvent };
     }
 
     return normalizedOptions;

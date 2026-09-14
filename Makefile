@@ -1,5 +1,6 @@
 PNPM ?= pnpm
 PACKAGE_DIR := code
+LOCAL_ARTIFACT_DIR := $(PACKAGE_DIR)/.artifacts
 
 .DEFAULT_GOAL := help
 
@@ -11,7 +12,7 @@ help: ## Show available targets
 install: ## Install locked dependencies
 	$(PNPM) --dir "$(PACKAGE_DIR)" install --frozen-lockfile
 
-.PHONY: format format-check lint typecheck test test-backend test-backend-redis test-backend-all test-coverage build pack-check release-check
+.PHONY: format format-check lint typecheck test test-backend test-backend-redis test-backend-all test-coverage build pack-local pack-check release-check
 format: ## Format source code and documentation
 	$(PNPM) --dir "$(PACKAGE_DIR)" run format
 
@@ -41,6 +42,12 @@ test-coverage: ## Run unit tests with coverage reporting
 
 build: ## Build ESM, CommonJS, declarations, and source maps
 	$(PNPM) --dir "$(PACKAGE_DIR)" run build
+
+pack-local: build ## Build and pack the package for local installation
+	@mkdir -p "$(LOCAL_ARTIFACT_DIR)"
+	@rm -f "$(LOCAL_ARTIFACT_DIR)"/*.tgz
+	$(PNPM) --dir "$(PACKAGE_DIR)" pack --pack-destination .artifacts
+	@printf '\nFrom the consumer project, refresh the local package with:\n  pnpm remove nestjs-cache-proxy\n  pnpm add --force "%s/"*.tgz\n' "$$(pwd)/$(LOCAL_ARTIFACT_DIR)"
 
 pack-check: ## Verify the packed tarball with ESM, CommonJS, and TypeScript consumers
 	$(PNPM) --dir "$(PACKAGE_DIR)" run pack:check

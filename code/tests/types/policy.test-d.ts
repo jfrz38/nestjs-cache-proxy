@@ -1,11 +1,12 @@
 import {
   buildCacheKey,
   cachedProvider,
+  CacheEventType,
   CacheProxyModule,
   defineCachePolicy,
   type BuildCacheKeyInput,
-  type CacheErrorEvent,
-  type CacheErrorHook,
+  type CacheEvent,
+  type CacheEventHook,
   type CachedProvider,
   type StructuredKeyInput,
 } from '../../src/index.js';
@@ -41,6 +42,11 @@ const policy = defineCachePolicy<UserRepository>()({
       version: 1,
       ttl: 60_000,
       key: ([id]) => id,
+      cacheIf: ({ args, result }) => {
+        const id: string = args[0];
+        const user: User | null = result;
+        return id === '1' && user !== null;
+      },
     },
   },
   methods: {
@@ -85,10 +91,14 @@ const cacheKeyInput: BuildCacheKeyInput = {
 };
 
 const cacheKey = buildCacheKey(cacheKeyInput);
-const cacheErrorHook: CacheErrorHook = (event: CacheErrorEvent) => {
-  const operation: 'delete' | 'get' | 'set' = event.operation;
-  void operation;
+const cacheEventHook: CacheEventHook = (event: CacheEvent) => {
+  if (event.type === CacheEventType.GET_ERROR) {
+    const cause: Error = event.cause;
+    void cause;
+  }
 };
+
+const cacheEventType: CacheEventType = CacheEventType.GET_HIT;
 
 class DefaultUserRepository extends UserRepository {
   public findById(id: string): Promise<User | null> {
@@ -201,7 +211,8 @@ cachedProvider<UserRepository>({
 void provider;
 void structuredInput;
 void cacheKey;
-void cacheErrorHook;
+void cacheEventHook;
+void cacheEventType;
 
 const testCache: TestCache = createTestCache();
 const testCacheOperationType: TestCacheOperationType =
