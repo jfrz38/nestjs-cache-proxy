@@ -19,10 +19,12 @@ export type {
 } from './domain/key/cache-key.types.js';
 export type { CacheKeyValidationCode } from './domain/key/cache-key-validation-error.js';
 export type { CacheProxyOptions } from './infrastructure/nest/cache-proxy-options.js';
-export type { CacheErrorEvent } from './application/runtime/cache-error-event.js';
-export type { CacheErrorHook } from './infrastructure/nest/cache-error-hook-reporter.js';
+export { CacheEventType } from './application/runtime/cache-event.js';
+export type { CacheEvent } from './application/runtime/cache-event.js';
+export type { CacheEventHook } from './infrastructure/nest/cache-event-hook-reporter.js';
 export type {
   CacheEffect,
+  CacheAdmissionContext,
   CachePolicy,
   CachePolicyMethods,
   CacheReadRule,

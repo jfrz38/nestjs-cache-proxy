@@ -1,9 +1,9 @@
 import type { CacheKeyNamespace } from '../../domain/key/cache-key.types.js';
-import type { CacheErrorHook } from './cache-error-hook-reporter.js';
+import type { CacheEventHook } from './cache-event-hook-reporter.js';
 
 export interface CacheProxyOptions {
   readonly namespace: CacheKeyNamespace;
-  readonly onCacheError?: CacheErrorHook;
+  readonly onCacheEvent?: CacheEventHook;
 }
 
 export const CACHE_PROXY_OPTIONS = Symbol('nestjs-cache-proxy.options');

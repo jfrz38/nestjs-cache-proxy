@@ -27,7 +27,9 @@ export class CacheAsideExecutor {
 
     const result = await invoke();
 
-    await this.cache.set(rule.resource.value, key, result, rule.ttl);
+    await this.cache.set(rule.resource.value, key, result, rule.ttl, () =>
+      rule.shouldCache(args, result),
+    );
 
     return result;
   }

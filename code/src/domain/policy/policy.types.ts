@@ -22,11 +22,22 @@ export type MethodResult<T, K extends PromiseMethodName<T>> = T[K] extends (
   ? Awaited<Result>
   : never;
 
+export interface CacheAdmissionContext<
+  Args extends readonly unknown[],
+  Result,
+> {
+  readonly args: Readonly<Args>;
+  readonly result: Result;
+}
+
 export interface CacheResource<T, K extends PromiseMethodName<T>> {
   readonly method: K;
   readonly version: number;
   readonly ttl: number;
   readonly key: (args: NoInfer<MethodArgs<T, K>>) => StructuredKeyInput;
+  readonly cacheIf?: (
+    context: CacheAdmissionContext<MethodArgs<T, K>, MethodResult<T, K>>,
+  ) => boolean;
 }
 
 export type CacheResourceMap<T> = Record<

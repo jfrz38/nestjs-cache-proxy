@@ -81,13 +81,18 @@ Sensitive material must never be used in keys.
 A configured read derives a key, reads the cache, calls the provider on a miss, then attempts a
 cache write. Cache reads and writes fail open, while provider errors propagate unchanged. A private
 envelope distinguishes a cached `null` from a miss. `undefined` is never stored; other falsy values
-are cacheable.
+are cacheable. Resources can declare a synchronous `cacheIf({ args, result })` predicate; only a
+strict `true` stores the value. A skipped write never invalidates an existing value, and predicate
+failures are treated as fail-open set failures.
 
 A configured mutation calls the provider first. It then runs exact invalidation or write-through
 effects in declaration order. Dynamic targets require `keyArgs({ args, result })` unless their key
 builder accepts no arguments. Write-through requires an explicit canonical `value({ args, result })`.
-Cache effect failures are reported through a non-throwing internal seam and do not change the
-provider result.
+Cache operations emit one optional redacted root event with operation, outcome, resource name, and
+a fresh sanitized cause on errors. Event hooks are observational: their failures do not change the
+provider result and do not create recursive events. Cache effect failures do not change the provider
+result. Write-through admission evaluates the destination resource predicate against its derived
+key arguments and projected value.
 
 No scans, prefix deletes, atomic multi-key operations, request coalescing, or transaction hooks are
 provided. An earlier concurrent read can repopulate a stale value after a mutation. A transaction
