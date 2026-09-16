@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CacheErrorHook } from '../../../src/index.js';
 import {
   CacheProxyModule,
+  cachedProvider,
   defineCachePolicy,
   InvalidCachedProviderError,
 } from '../../../src/index.js';
@@ -116,6 +117,82 @@ describe('CacheProxyModule', () => {
         .filter((operation) => operation.type === TestCacheOperationType.GET),
     ).toHaveLength(4);
     expect(module.get(CACHE_MANAGER)).toBe(testCache.cache);
+    await module.close();
+  });
+
+  it('resolves imported dependencies from a dedicated cache module', async () => {
+    const testCache = createTestCache();
+    const dependencyToken = Symbol('reader-dependency');
+    const dedicatedReaderToken = Symbol('dedicated-reader');
+    let calls = 0;
+
+    @Injectable()
+    class ReaderWithImportedDependency implements UserReader {
+      public constructor(
+        @Inject(dependencyToken) private readonly prefix: string,
+      ) {}
+
+      public findById(id: string): Promise<string> {
+        calls += 1;
+        return Promise.resolve(`${this.prefix}:${id}`);
+      }
+    }
+
+    @Injectable()
+    class DedicatedReaderConsumer {
+      public constructor(
+        @Inject(dedicatedReaderToken) public readonly reader: UserReader,
+      ) {}
+    }
+
+    @Module({
+      providers: [{ provide: dependencyToken, useValue: 'imported' }],
+      exports: [dependencyToken],
+    })
+    class ReaderDependenciesModule {}
+
+    @Module({
+      imports: [ReaderDependenciesModule],
+      providers: [
+        ...cachedProvider({
+          provide: dedicatedReaderToken,
+          useClass: ReaderWithImportedDependency,
+          policy,
+        }),
+      ],
+      exports: [dedicatedReaderToken],
+    })
+    class UserCacheModule {}
+
+    @Module({
+      imports: [UserCacheModule],
+      providers: [DedicatedReaderConsumer],
+    })
+    class ConsumerModule {}
+
+    @Module({
+      imports: [
+        CacheModule.register({ isGlobal: true }),
+        CacheProxyModule.forRoot({
+          namespace: { application: 'users-api', environment: 'test' },
+        }),
+        ConsumerModule,
+      ],
+    })
+    class ApplicationModule {}
+
+    const module = await Test.createTestingModule({
+      imports: [ApplicationModule],
+    })
+      .overrideProvider(CACHE_MANAGER)
+      .useValue(testCache.cache)
+      .compile();
+
+    const consumer = module.get(DedicatedReaderConsumer);
+    await expect(consumer.reader.findById('1')).resolves.toBe('imported:1');
+    await expect(consumer.reader.findById('1')).resolves.toBe('imported:1');
+    expect(calls).toBe(1);
+
     await module.close();
   });
 

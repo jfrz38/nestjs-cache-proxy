@@ -94,6 +94,69 @@ On a miss, the proxy calls the provider and attempts to write the result. Cache 
 writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
 strings are cacheable. `undefined` is returned but not stored.
 
+## Organizing cache registration
+
+Keep cached-provider registration in the feature module by default. A dedicated cache module
+is useful when a feature has several policies or when cache composition should remain separate
+from the rest of the feature wiring. Prefer one such module per feature over a central module
+that couples unrelated features.
+
+Use `cachedProvider()` directly when the concrete implementation has constructor dependencies
+from imported modules. NestJS does not make modules imported by a parent feature module visible
+inside the dynamic module returned by `forFeature()`.
+
+```ts
+import { Injectable, Module } from '@nestjs/common';
+import { cachedProvider } from 'nestjs-cache-proxy';
+import { DatabaseClient, DatabaseModule } from '../database/database.module.js';
+import { userCachePolicy } from './user-repository.cache-policy.js';
+
+export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
+
+@Injectable()
+class SqlUserRepository {
+  public constructor(private readonly database: DatabaseClient) {}
+
+  public findById(id: string) {
+    return this.database.users.findById(id);
+  }
+}
+
+@Module({
+  imports: [DatabaseModule],
+  providers: [
+    ...cachedProvider({
+      provide: USER_REPOSITORY,
+      useClass: SqlUserRepository,
+      policy: userCachePolicy,
+    }),
+  ],
+  exports: [USER_REPOSITORY],
+})
+export class UsersCacheModule {}
+```
+
+Consumers import `UsersCacheModule` and inject `USER_REPOSITORY`. TypeScript interfaces cannot
+be NestJS tokens because they do not exist at runtime; use a class, abstract class, string, or
+symbol as the public token. The concrete class must be importable by the registration module,
+but it does not need to be exported as a NestJS provider.
+
+Policies are TypeScript objects rather than JSON configuration because key and value derivation
+uses typed functions. Keep each policy close to the provider and module that register it. For a
+repository cache, this is a useful optional layout:
+
+```text
+users/
+  infrastructure/
+    persistence/
+      cache/
+        user-repository.cache-policy.ts
+        users-cache.module.ts
+```
+
+For cached use cases or other providers, place the policy with that feature's composition code
+rather than under `persistence`.
+
 ## Mutations
 
 Mutations run the provider first, then apply exact effects in declaration order. Use

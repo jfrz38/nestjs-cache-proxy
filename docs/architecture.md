@@ -38,6 +38,13 @@ once per application context. `CacheProxyModule.forFeature(registrations)` turns
 `cachedProvider` descriptor into an internal concrete provider plus a proxy under the original
 public token.
 
+`cachedProvider(registration)` exposes the same provider definitions for direct use in a module's
+`providers` array. This is the appropriate composition when a dedicated, feature-owned cache module
+must import modules that export constructor dependencies of the concrete implementation. NestJS
+module visibility still applies: imports of a parent module are not inherited by the dynamic module
+created by `forFeature()`. The dedicated module exports only the public runtime token; the concrete
+implementation remains private. TypeScript interfaces are not runtime tokens.
+
 Only singleton-scoped `useClass` providers are supported. NestJS constructs the concrete provider,
 resolves its constructor dependencies, and invokes lifecycle hooks once. The public proxy preserves
 method `this` binding and passes through unconfigured methods, properties, symbols, and accessors,
@@ -52,6 +59,12 @@ ordinary NestJS feature-module exports.
 `defineCachePolicy<T>()` produces a plain typed policy. A resource names a Promise-returning method,
 resource version, TTL in milliseconds, and a key builder. Methods either select a read resource with
 `cache` or declare a non-empty ordered mutation `effects` list.
+
+Policies are application-owned TypeScript values, not JSON configuration: key arguments and
+write-through values are derived by typed functions. Registration normally stays with its feature.
+For repository caching, `infrastructure/persistence/cache` is a useful optional location for the
+policy and dedicated cache module; policies for other provider types stay with their respective
+composition code.
 
 Policies are validated once and compiled into immutable runtime rules. A key has the stable `k1`
 format and includes namespace, resource, version, and canonical structured input. The accepted input
