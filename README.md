@@ -9,12 +9,28 @@
 [![NestJS](https://img.shields.io/badge/NestJS-11%20%7C%2012-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
 [![License](https://img.shields.io/npm/l/nestjs-cache-proxy)](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/LICENSE)
 
+`nestjs-cache-proxy` wraps your existing NestJS providers with a cache-aware proxy,
+keeping cache keys, TTLs, and invalidation rules in a typed policy instead of scattering
+cache logic throughout your application.
+
 Choose which methods should be cached and how long their results should live. The first
 call runs your class as usual; later calls can reuse the cached result. Everything that
 depends on that class keeps working as before.
 
 You keep control of the cache itself. Use NestJS `CacheModule` with its default in-memory
 store, Redis, or another compatible backend.
+
+## Contents
+
+- [Why use it?](#why-use-it)
+- [Get started](#get-started)
+- [Examples](#examples)
+- [Keep cached data fresh](#keep-cached-data-fresh)
+- [Organizing cache registration](#organizing-cache-registration)
+- [Testing](#testing)
+- [Backends and compatibility](#backends-and-compatibility)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
 
 ## Why use it?
 
@@ -132,6 +148,22 @@ Any singleton NestJS `useClass` provider can be registered when its configured m
 return Promises. This works well for repositories, query services, and use cases. Cache the
 provider called by a controller rather than the controller itself.
 
+## Examples
+
+The repository contains small, compilable recipes for common composition choices. They are
+tested against the packed npm artifact but are not included in the published package.
+
+| Recipe                                                                                                       | What it demonstrates                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [Cache in a repository](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cache-in-repository) | Share a cached read and invalidate its exact key after a mutation.     |
+| [Cache in a use case](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cache-in-use-case)     | Cache one application operation while leaving its dependency uncached. |
+| [Cross-module cache](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cross-module-cache)     | Export a cached provider from its owning module to another module.     |
+| [Redis backend](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/redis-backend)               | Configure Redis as the application-owned cache-manager store.          |
+
+There is no universal cache boundary. Repository caching can share entries across several
+operations, while use-case caching can represent the complete result of one operation. Each
+recipe explains the trade-offs and the application-specific values that need replacing.
+
 ## Keep cached data fresh
 
 After a successful update, a policy can remove an old entry with `invalidate` or replace it
@@ -163,12 +195,21 @@ Effects target exact keys. They do not scan the cache, delete by prefix, or perf
 multi-key operations. Include tenant identity in every tenant-specific key. Never include
 credentials, tokens, or other sensitive data because cache infrastructure can expose keys.
 
+Increment a resource's `version` when its key meaning or stored value becomes incompatible.
+Changing the version isolates new entries; it does not migrate or remove entries written by
+an older version.
+
 ## Organizing cache registration
 
 Keep cached-provider registration in the feature module by default. A dedicated cache module
 is useful when a feature has several policies or when cache composition should remain separate
 from the rest of the feature wiring. Prefer one such module per feature over a central module
 that couples unrelated features.
+
+| Registration                    | Prefer it when                                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `CacheProxyModule.forFeature()` | The dynamic module can construct the cached class from dependencies visible to it.                    |
+| `cachedProvider()`              | The cached class depends on providers owned or imported by the feature module doing the registration. |
 
 Use `cachedProvider()` directly when the concrete implementation has constructor dependencies
 from imported modules. NestJS does not make modules imported by a parent feature module visible
@@ -269,6 +310,35 @@ The backend contract was last verified on 2026-09-12:
 TTL is passed in milliseconds. Real backend expiration is eventually observable. The
 contract does not certify Redis clusters, sentinel, TLS, administration commands, or every
 Keyv adapter. Connection and retry configuration remain application-owned.
+
+## Troubleshooting
+
+### NestJS cannot resolve a cached provider dependency
+
+Modules imported by a parent feature module are not automatically visible inside the dynamic
+module returned by `forFeature()`. Register the provider with `cachedProvider()` in the parent
+module so it can use that module's imports and providers.
+
+### A TypeScript interface cannot be injected
+
+Interfaces do not exist at runtime. Use a class, abstract class, string, or symbol as the
+`provide` token and inject the interface only as its TypeScript type.
+
+### An entry survives a deployment with changed data
+
+Increment the affected resource's `version` when the key semantics or cached value format
+changes. Old entries remain in the backend until their own TTL expires or the application
+removes them operationally.
+
+### Expiration is not immediate
+
+TTL values are milliseconds, and expiration timing depends on the selected backend. Test the
+behavior with the same adapter and configuration used by the application.
+
+### Cache failures do not fail the request
+
+Cache operations deliberately fail open. Configure the `onCacheError` hook to report failures
+to the application's logging or monitoring system.
 
 ## Limitations
 

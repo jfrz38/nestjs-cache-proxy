@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const packageDirectory = resolve(scriptDirectory, '..');
+const examplesDirectory = resolve(packageDirectory, '..', 'examples');
 const artifactsDirectory = join(packageDirectory, '.artifacts');
 const consumerFixture = join(
   packageDirectory,
@@ -44,6 +45,7 @@ const forbiddenPathPrefixes = [
   'tests/',
   'scripts/',
   'fixtures/',
+  'examples/',
   'docs/',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
@@ -153,6 +155,7 @@ async function createConsumer(type) {
           '@nestjs/cache-manager': nestjsCacheManagerVersion,
           '@nestjs/common': nestjsVersion,
           '@nestjs/core': nestjsVersion,
+          '@keyv/redis': '5.1.6',
           cacheable: '2.5.0',
           'cache-manager': cacheManagerVersion,
           keyv: '5.6.0',
@@ -241,6 +244,15 @@ async function verifyExtractedPackage(extractedDirectory) {
   }
 }
 
+/** @param {string} directory */
+async function findTypeScriptFiles(directory) {
+  const entries = await readdir(directory, { recursive: true });
+  return entries
+    .map(String)
+    .filter((entry) => entry.endsWith('.ts'))
+    .map((entry) => join(directory, entry));
+}
+
 let tarball = '';
 let esmDirectory = '';
 let cjsDirectory = '';
@@ -307,6 +319,8 @@ try {
   );
 
   await cp(consumerFixture, join(esmDirectory, 'index.ts'));
+  const consumerExamples = join(esmDirectory, 'examples');
+  await cp(examplesDirectory, consumerExamples, { recursive: true });
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
   run(
     node,
@@ -323,6 +337,27 @@ try {
       '--types',
       'node',
       'index.ts',
+    ],
+    esmDirectory,
+  );
+  run(
+    node,
+    [
+      tsc,
+      '--noEmit',
+      '--experimentalDecorators',
+      '--emitDecoratorMetadata',
+      '--module',
+      'NodeNext',
+      '--moduleResolution',
+      'NodeNext',
+      '--target',
+      'ES2022',
+      '--types',
+      'node',
+      '--strict',
+      '--skipLibCheck',
+      ...(await findTypeScriptFiles(consumerExamples)),
     ],
     esmDirectory,
   );
