@@ -41,10 +41,10 @@
   "scripts": {
     "build": "tsup",
     "clean": "node ./scripts/clean.mjs",
-    "format": "prettier --write ../*.md ../docs/**/*.md ./**/*.{ts,mts,mjs,json}",
-    "format:check": "prettier --check ../*.md ../docs/**/*.md ./**/*.{ts,mts,mjs,json}",
+    "format": "prettier --write ../*.md ../docs/**/*.md ../examples/**/*.{md,ts} ./**/*.{ts,mts,mjs,json}",
+    "format:check": "prettier --check ../*.md ../docs/**/*.md ../examples/**/*.{md,ts} ./**/*.{ts,mts,mjs,json}",
     "lint": "eslint src tests scripts && pnpm run lint:markdown",
-    "lint:markdown": "markdownlint-cli2 ../*.md ../docs/**/*.md",
+    "lint:markdown": "markdownlint-cli2 ../*.md ../docs/**/*.md ../examples/**/*.md",
     "pack:check": "node ./scripts/pack-check.mjs",
     "release:check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:coverage && pnpm run build && pnpm run pack:check && pnpm run test:backend:all",
     "postpack": "node ./scripts/cleanup-package-files.mjs",

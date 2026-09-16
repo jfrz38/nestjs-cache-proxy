@@ -1,25 +1,59 @@
-# nestjs-cache-proxy
+# NestJS Cache Proxy
 
-Transparent, declarative caching for NestJS providers. Define cache behavior next to a
-provider contract; the package supplies a proxy while your application continues to own
-the cache backend and its operational configuration.
+**Add caching to your NestJS services and repositories without changing how the rest of your application uses them.**
 
-## Requirements
+[![CI](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
+[![npm downloads](https://img.shields.io/npm/dm/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
+[![Node.js](https://img.shields.io/node/v/nestjs-cache-proxy)](https://nodejs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11%20%7C%2012-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![License](https://img.shields.io/npm/l/nestjs-cache-proxy)](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/LICENSE)
 
-- Node.js 20.19.0 or later
-- NestJS 11 or 12
-- `@nestjs/cache-manager` and `cache-manager`
+`nestjs-cache-proxy` wraps your existing NestJS providers with a cache-aware proxy,
+keeping cache keys, TTLs, and invalidation rules in a typed policy instead of scattering
+cache logic throughout your application.
 
-## Install
+Choose which methods should be cached and how long their results should live. The first
+call runs your class as usual; later calls can reuse the cached result. Everything that
+depends on that class keeps working as before.
+
+You keep control of the cache itself. Use NestJS `CacheModule` with its default in-memory
+store, Redis, or another compatible backend.
+
+## Contents
+
+- [Why use it?](#why-use-it)
+- [Get started](#get-started)
+- [Examples](#examples)
+- [Keep cached data fresh](#keep-cached-data-fresh)
+- [Organizing cache registration](#organizing-cache-registration)
+- [Testing](#testing)
+- [Backends and compatibility](#backends-and-compatibility)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+
+## Why use it?
+
+- Add caching without putting cache reads and writes inside your services or repositories.
+- Keep controllers and other consumers unchanged.
+- Choose exactly which methods are cached and when their entries should be removed or updated.
+- Keep using the NestJS cache setup and backend your application already owns.
+- Keep returning your class's result when a cache operation fails.
+- Catch invalid method names and arguments through TypeScript.
+
+## Get started
+
+`nestjs-cache-proxy` requires Node.js 20.19.0 or later and supports NestJS 11 and 12.
+Install it together with the NestJS cache packages:
 
 ```sh
-pnpm add nestjs-cache-proxy @nestjs/cache-manager cache-manager
+npm install nestjs-cache-proxy @nestjs/cache-manager cache-manager
 ```
 
-## Quick start
+### 1. Configure your cache
 
-Configure an application-owned `CacheModule` once, then add `CacheProxyModule.forRoot`.
-The proxy module never creates or configures a cache backend.
+Register your application cache once, then add `CacheProxyModule.forRoot()`. The package
+uses this cache but never creates or configures a backend for you.
 
 ```ts
 import { CacheModule } from '@nestjs/cache-manager';
@@ -37,7 +71,10 @@ import { CacheProxyModule } from 'nestjs-cache-proxy';
 export class ApplicationCacheModule {}
 ```
 
-Describe which Promise-returning methods are cacheable with a typed policy:
+### 2. Choose what to cache
+
+Create a policy for the Promise-returning methods you want to cache. Here, every user is
+cached by ID for five minutes:
 
 ```ts
 import { defineCachePolicy } from 'nestjs-cache-proxy';
@@ -61,8 +98,10 @@ export const userCachePolicy = defineCachePolicy<UserRepository>()({
 });
 ```
 
-Register the concrete singleton provider in its feature module. Consumers inject the
-original token and receive the caching proxy.
+### 3. Register your class
+
+Connect the class to its policy in the feature module. Existing consumers continue to
+inject `SqlUserRepository` and automatically receive the cached behavior.
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -90,46 +129,46 @@ class SqlUserRepository {
 export class UsersModule {}
 ```
 
-On a miss, the proxy calls the provider and attempts to write the result. Cache reads and
-writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
-strings are cacheable. `undefined` is returned but not stored. A resource can further control
-admission with `cacheIf`; only a `true` result stores the value, and a skipped write preserves
-any existing entry.
+That is all the consuming code needs to know. It calls `findById()` as before while the
+registered policy handles cache reads and writes around it.
 
-```ts
-const policy = defineCachePolicy<UserRepository>()({
-  resources: {
-    userById: {
-      method: 'findById',
-      version: 1,
-      ttl: 300_000,
-      key: ([id]) => id,
-      cacheIf: ({ result }) => result !== null,
-    },
-  },
-  methods: { findById: { cache: 'userById' } },
-});
-```
+## How it works
 
-Use `onCacheEvent` in `forRoot` to observe cache outcomes. `CacheEventType` provides a semantic
-discriminant for each outcome. Events contain only a type, resource name, and a sanitized cause
-for errors; they never include keys, arguments, or values. Hook failures are ignored.
+For a cached method call, the package:
 
-```ts
-CacheProxyModule.forRoot({
-  namespace: { application: 'users-api', environment: 'production' },
-  onCacheEvent: (event) => {
-    if (event.type === CacheEventType.GET_HIT) {
-      logger.debug(`Cache hit for ${event.resource}`);
-    }
-  },
-});
-```
+1. Builds a key from the method arguments.
+2. Returns the stored value when one exists.
+3. Otherwise calls your class and stores its result for the configured time.
 
-## Mutations
+Cache reads and writes fail open: a cache error does not replace the result or error from
+your class. `null`, `false`, `0`, and empty strings can be cached. `undefined` is returned
+but is not stored.
 
-Mutations run the provider first, then apply exact effects in declaration order. Use
-`invalidate` to remove a known key or `writeThrough` to replace it with a canonical value.
+Any singleton NestJS `useClass` provider can be registered when its configured methods
+return Promises. This works well for repositories, query services, and use cases. Cache the
+provider called by a controller rather than the controller itself.
+
+## Examples
+
+The repository contains small, compilable recipes for common composition choices. They are
+tested against the packed npm artifact but are not included in the published package.
+
+| Recipe                                                                                                       | What it demonstrates                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [Cache in a repository](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cache-in-repository) | Share a cached read and invalidate its exact key after a mutation.     |
+| [Cache in a use case](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cache-in-use-case)     | Cache one application operation while leaving its dependency uncached. |
+| [Cross-module cache](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/cross-module-cache)     | Export a cached provider from its owning module to another module.     |
+| [Redis backend](https://github.com/jfrz38/nestjs-cache-proxy/tree/main/examples/redis-backend)               | Configure Redis as the application-owned cache-manager store.          |
+
+There is no universal cache boundary. Repository caching can share entries across several
+operations, while use-case caching can represent the complete result of one operation. Each
+recipe explains the trade-offs and the application-specific values that need replacing.
+
+## Keep cached data fresh
+
+After a successful update, a policy can remove an old entry with `invalidate` or replace it
+with a new value using `writeThrough`. Updates always run your class first; cache effects
+only run when that call succeeds.
 
 ```ts
 const policy = defineCachePolicy<
@@ -152,15 +191,87 @@ const policy = defineCachePolicy<
 });
 ```
 
-Effects do not scan, delete by prefix, or perform atomic multi-key operations. Include
-tenant identity in every tenant-scoped key input. Never include credentials, tokens, or
-other sensitive data in keys because cache infrastructure can expose them.
+Effects target exact keys. They do not scan the cache, delete by prefix, or perform atomic
+multi-key operations. Include tenant identity in every tenant-specific key. Never include
+credentials, tokens, or other sensitive data because cache infrastructure can expose keys.
+
+Increment a resource's `version` when its key meaning or stored value becomes incompatible.
+Changing the version isolates new entries; it does not migrate or remove entries written by
+an older version.
+
+## Organizing cache registration
+
+Keep cached-provider registration in the feature module by default. A dedicated cache module
+is useful when a feature has several policies or when cache composition should remain separate
+from the rest of the feature wiring. Prefer one such module per feature over a central module
+that couples unrelated features.
+
+| Registration                    | Prefer it when                                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `CacheProxyModule.forFeature()` | The dynamic module can construct the cached class from dependencies visible to it.                    |
+| `cachedProvider()`              | The cached class depends on providers owned or imported by the feature module doing the registration. |
+
+Use `cachedProvider()` directly when the concrete implementation has constructor dependencies
+from imported modules. NestJS does not make modules imported by a parent feature module visible
+inside the dynamic module returned by `forFeature()`.
+
+```ts
+import { Injectable, Module } from '@nestjs/common';
+import { cachedProvider } from 'nestjs-cache-proxy';
+import { DatabaseClient, DatabaseModule } from '../database/database.module.js';
+import { userCachePolicy } from './user-repository.cache-policy.js';
+
+export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
+
+@Injectable()
+class SqlUserRepository {
+  public constructor(private readonly database: DatabaseClient) {}
+
+  public findById(id: string) {
+    return this.database.users.findById(id);
+  }
+}
+
+@Module({
+  imports: [DatabaseModule],
+  providers: [
+    ...cachedProvider({
+      provide: USER_REPOSITORY,
+      useClass: SqlUserRepository,
+      policy: userCachePolicy,
+    }),
+  ],
+  exports: [USER_REPOSITORY],
+})
+export class UsersCacheModule {}
+```
+
+Consumers import `UsersCacheModule` and inject `USER_REPOSITORY`. TypeScript interfaces cannot
+be NestJS tokens because they do not exist at runtime; use a class, abstract class, string, or
+symbol as the public token. The concrete class must be importable by the registration module,
+but it does not need to be exported as a NestJS provider.
+
+Policies are TypeScript objects rather than JSON configuration because key and value derivation
+uses typed functions. Keep each policy close to the provider and module that register it. For a
+repository cache, this is a useful optional layout:
+
+```text
+users/
+  infrastructure/
+    persistence/
+      cache/
+        user-repository.cache-policy.ts
+        users-cache.module.ts
+```
+
+For cached use cases or other providers, place the policy with that feature's composition code
+rather than under `persistence`.
 
 ## Testing
 
-`nestjs-cache-proxy/testing` supplies a deterministic in-memory cache for application
-tests. Override the application-owned `CACHE_MANAGER` with it; it is not a Redis or full
-cache-manager emulator.
+`nestjs-cache-proxy/testing` provides a deterministic in-memory cache for application tests.
+Override the application-owned `CACHE_MANAGER` with it, seed the values a test needs, and move
+its clock forward without waiting in real time. It is not a Redis or full cache-manager emulator.
 
 ```ts
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -200,6 +311,35 @@ TTL is passed in milliseconds. Real backend expiration is eventually observable.
 contract does not certify Redis clusters, sentinel, TLS, administration commands, or every
 Keyv adapter. Connection and retry configuration remain application-owned.
 
+## Troubleshooting
+
+### NestJS cannot resolve a cached provider dependency
+
+Modules imported by a parent feature module are not automatically visible inside the dynamic
+module returned by `forFeature()`. Register the provider with `cachedProvider()` in the parent
+module so it can use that module's imports and providers.
+
+### A TypeScript interface cannot be injected
+
+Interfaces do not exist at runtime. Use a class, abstract class, string, or symbol as the
+`provide` token and inject the interface only as its TypeScript type.
+
+### An entry survives a deployment with changed data
+
+Increment the affected resource's `version` when the key semantics or cached value format
+changes. Old entries remain in the backend until their own TTL expires or the application
+removes them operationally.
+
+### Expiration is not immediate
+
+TTL values are milliseconds, and expiration timing depends on the selected backend. Test the
+behavior with the same adapter and configuration used by the application.
+
+### Cache failures do not fail the request
+
+Cache operations deliberately fail open. Configure the `onCacheError` hook to report failures
+to the application's logging or monitoring system.
+
 ## Limitations
 
 - Only Promise-returning methods can be configured.
@@ -214,7 +354,7 @@ Keyv adapter. Connection and retry configuration remain application-owned.
 
 ## Development
 
-The publishable package lives in [`code/`](code/). Install dependencies and run fast checks:
+The publishable package lives in `code/`. Install dependencies and run the project checks:
 
 ```sh
 make install
@@ -254,7 +394,7 @@ Run `make release-check` before preparing a release. It includes coverage and me
 backend contracts; Redis validation requires a running Docker daemon. The command validates
 the package but never publishes, tags, or creates a GitHub release.
 
-- [Architecture](docs/architecture.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
-- [Security policy](SECURITY.md)
+- [Architecture](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/docs/architecture.md)
+- [Contributing](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/CONTRIBUTING.md)
+- [Changelog](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/CHANGELOG.md)
+- [Security policy](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/SECURITY.md)
