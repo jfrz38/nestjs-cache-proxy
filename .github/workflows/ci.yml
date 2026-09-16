@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   quality:
@@ -178,3 +178,74 @@ jobs:
       - run: pnpm --dir code exec vitest run tests/integration/redis/cache-backend.test.ts
         env:
           REDIS_URL: redis://127.0.0.1:6379
+
+  release:
+    name: Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality, runtime, peer-compatibility, backend-compatibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compare package version with previous main revision
+        id: version-change
+        uses: jfrz38/check-version-change@712f1f323f716ff1241b4fdd99e698d56daf462d # v1.4.0
+        with:
+          file-path: code/package.json
+          compare-source: git-ref
+          compare-ref: ${{ github.event.before }}
+          allow-missing-compare-file: true
+
+      - name: Reject a non-increasing version change
+        if: >-
+          steps.version-change.outputs.changed == 'true' &&
+          steps.version-change.outputs.compared-version != '' &&
+          steps.version-change.outputs.is-higher != 'true'
+        run: |
+          echo "The candidate version must be greater than the previous main version." >&2
+          exit 1
+
+      - name: Read release version
+        id: version
+        if: steps.version-change.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.version-change.outputs.local-version }}
+        run: |
+          test -n "$VERSION"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable tag and GitHub Release
+        if: >-
+          steps.version-change.outputs.changed == 'true' &&
+          (steps.version-change.outputs.compared-version == '' ||
+          steps.version-change.outputs.is-higher == 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.value }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+
+          tag_ref="$(git ls-remote origin "refs/tags/${TAG}" | awk '{print $1}')"
+          head_commit="$(git rev-parse HEAD)"
+          if [ -n "$tag_ref" ]; then
+            tag_commit="$(git ls-remote origin "refs/tags/${TAG}^{}" | awk '{print $1}')"
+            tag_commit="${tag_commit:-$tag_ref}"
+            if [ "$tag_commit" != "$head_commit" ]; then
+              echo "Tag $TAG already points to a different commit." >&2
+              exit 1
+            fi
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "nestjs-cache-proxy $TAG" --generate-notes
