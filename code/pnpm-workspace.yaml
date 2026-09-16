@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+
+# Vitest resolves this optional platform binding through Vite. It is not used on Windows.
+minimumReleaseAgeExclude:
+  - '@rolldown/binding-openharmony-arm64@1.2.8'

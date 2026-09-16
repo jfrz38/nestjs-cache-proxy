@@ -1,0 +1,251 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: code/pnpm-lock.yaml
+      - run: make install
+      - run: make format-check
+      - run: make lint
+      - run: make typecheck
+      - run: make test-coverage
+
+  runtime:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && fromJSON('[20, 22, 24]') || fromJSON('[24]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: code/pnpm-lock.yaml
+      - run: make install
+      - run: make test
+      - run: make build
+      - run: make pack-check
+
+  peer-compatibility:
+    name: NestJS ${{ matrix.nestjs }} compatibility
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nestjs: 11
+            nestjs_version: 11.0.0
+            nestjs_cache_manager_version: 3.0.0
+            cache_manager_version: 6.0.0
+          - nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 6.4.3
+          - nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - nestjs: 12
+            nestjs_version: 12.0.0
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 6.0.0
+          - nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: code/pnpm-lock.yaml
+      - run: make install
+      - run: make pack-check
+        env:
+          NESTJS_VERSION: ${{ matrix.nestjs_version }}
+          NESTJS_CACHE_MANAGER_VERSION: ${{ matrix.nestjs_cache_manager_version }}
+          CACHE_MANAGER_VERSION: ${{ matrix.cache_manager_version }}
+
+  backend-compatibility:
+    name: Node ${{ matrix.node }} / NestJS ${{ matrix.nestjs }} backends
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:8.10.1-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: 20
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 22
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 24
+            nestjs: 11
+            nestjs_version: 11.2.3
+            nestjs_cache_manager_version: 3.1.3
+            cache_manager_version: 7.2.9
+          - node: 20
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - node: 22
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+          - node: 24
+            nestjs: 12
+            nestjs_version: 12.0.1
+            nestjs_cache_manager_version: 12.0.0
+            cache_manager_version: 7.2.9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: code/pnpm-lock.yaml
+      - run: make install
+      - run: >-
+          pnpm --dir code add --save-dev --save-exact
+          @nestjs/cache-manager@${{ matrix.nestjs_cache_manager_version }}
+          @nestjs/common@${{ matrix.nestjs_version }}
+          @nestjs/core@${{ matrix.nestjs_version }}
+          @nestjs/testing@${{ matrix.nestjs_version }}
+          cache-manager@${{ matrix.cache_manager_version }}
+      - run: node --version
+      - run: >-
+          pnpm --dir code list --depth 0
+          @keyv/redis keyv @nestjs/cache-manager @nestjs/common @nestjs/core cache-manager
+      - run: make test-backend
+      - run: pnpm --dir code exec vitest run tests/integration/redis/cache-backend.test.ts
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+
+  release:
+    name: Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality, runtime, peer-compatibility, backend-compatibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compare package version with previous main revision
+        id: version-change
+        uses: jfrz38/check-version-change@712f1f323f716ff1241b4fdd99e698d56daf462d # v1.4.0
+        with:
+          file-path: code/package.json
+          compare-source: git-ref
+          compare-ref: ${{ github.event.before }}
+          allow-missing-compare-file: true
+
+      - name: Reject a non-increasing version change
+        if: >-
+          steps.version-change.outputs.changed == 'true' &&
+          steps.version-change.outputs.compared-version != '' &&
+          steps.version-change.outputs.is-higher != 'true'
+        run: |
+          echo "The candidate version must be greater than the previous main version." >&2
+          exit 1
+
+      - name: Read release version
+        id: version
+        if: steps.version-change.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.version-change.outputs.local-version }}
+        run: |
+          test -n "$VERSION"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable tag and GitHub Release
+        if: >-
+          steps.version-change.outputs.changed == 'true' &&
+          (steps.version-change.outputs.compared-version == '' ||
+          steps.version-change.outputs.is-higher == 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.value }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+
+          tag_ref="$(git ls-remote origin "refs/tags/${TAG}" | awk '{print $1}')"
+          head_commit="$(git rev-parse HEAD)"
+          if [ -n "$tag_ref" ]; then
+            tag_commit="$(git ls-remote origin "refs/tags/${TAG}^{}" | awk '{print $1}')"
+            tag_commit="${tag_commit:-$tag_ref}"
+            if [ "$tag_commit" != "$head_commit" ]; then
+              echo "Tag $TAG already points to a different commit." >&2
+              exit 1
+            fi
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "nestjs-cache-proxy $TAG" --generate-notes
