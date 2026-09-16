@@ -1,25 +1,43 @@
-# nestjs-cache-proxy
+# NestJS Cache Proxy
 
-Transparent, declarative caching for NestJS providers. Define cache behavior next to a
-provider contract; the package supplies a proxy while your application continues to own
-the cache backend and its operational configuration.
+**Add caching to your NestJS services and repositories without changing how the rest of your application uses them.**
 
-## Requirements
+[![CI](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
+[![npm downloads](https://img.shields.io/npm/dm/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
+[![Node.js](https://img.shields.io/node/v/nestjs-cache-proxy)](https://nodejs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11%20%7C%2012-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![License](https://img.shields.io/npm/l/nestjs-cache-proxy)](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/LICENSE)
 
-- Node.js 20.19.0 or later
-- NestJS 11 or 12
-- `@nestjs/cache-manager` and `cache-manager`
+Choose which methods should be cached and how long their results should live. The first
+call runs your class as usual; later calls can reuse the cached result. Everything that
+depends on that class keeps working as before.
 
-## Install
+You keep control of the cache itself. Use NestJS `CacheModule` with its default in-memory
+store, Redis, or another compatible backend.
+
+## Why use it?
+
+- Add caching without putting cache reads and writes inside your services or repositories.
+- Keep controllers and other consumers unchanged.
+- Choose exactly which methods are cached and when their entries should be removed or updated.
+- Keep using the NestJS cache setup and backend your application already owns.
+- Keep returning your class's result when a cache operation fails.
+- Catch invalid method names and arguments through TypeScript.
+
+## Get started
+
+`nestjs-cache-proxy` requires Node.js 20.19.0 or later and supports NestJS 11 and 12.
+Install it together with the NestJS cache packages:
 
 ```sh
-pnpm add nestjs-cache-proxy @nestjs/cache-manager cache-manager
+npm install nestjs-cache-proxy @nestjs/cache-manager cache-manager
 ```
 
-## Quick start
+### 1. Configure your cache
 
-Configure an application-owned `CacheModule` once, then add `CacheProxyModule.forRoot`.
-The proxy module never creates or configures a cache backend.
+Register your application cache once, then add `CacheProxyModule.forRoot()`. The package
+uses this cache but never creates or configures a backend for you.
 
 ```ts
 import { CacheModule } from '@nestjs/cache-manager';
@@ -37,7 +55,10 @@ import { CacheProxyModule } from 'nestjs-cache-proxy';
 export class ApplicationCacheModule {}
 ```
 
-Describe which Promise-returning methods are cacheable with a typed policy:
+### 2. Choose what to cache
+
+Create a policy for the Promise-returning methods you want to cache. Here, every user is
+cached by ID for five minutes:
 
 ```ts
 import { defineCachePolicy } from 'nestjs-cache-proxy';
@@ -61,8 +82,10 @@ export const userCachePolicy = defineCachePolicy<UserRepository>()({
 });
 ```
 
-Register the concrete singleton provider in its feature module. Consumers inject the
-original token and receive the caching proxy.
+### 3. Register your class
+
+Connect the class to its policy in the feature module. Existing consumers continue to
+inject `SqlUserRepository` and automatically receive the cached behavior.
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -90,9 +113,55 @@ class SqlUserRepository {
 export class UsersModule {}
 ```
 
-On a miss, the proxy calls the provider and attempts to write the result. Cache reads and
-writes fail open; provider errors are returned unchanged. `null`, `false`, `0`, and empty
-strings are cacheable. `undefined` is returned but not stored.
+That is all the consuming code needs to know. It calls `findById()` as before while the
+registered policy handles cache reads and writes around it.
+
+## How it works
+
+For a cached method call, the package:
+
+1. Builds a key from the method arguments.
+2. Returns the stored value when one exists.
+3. Otherwise calls your class and stores its result for the configured time.
+
+Cache reads and writes fail open: a cache error does not replace the result or error from
+your class. `null`, `false`, `0`, and empty strings can be cached. `undefined` is returned
+but is not stored.
+
+Any singleton NestJS `useClass` provider can be registered when its configured methods
+return Promises. This works well for repositories, query services, and use cases. Cache the
+provider called by a controller rather than the controller itself.
+
+## Keep cached data fresh
+
+After a successful update, a policy can remove an old entry with `invalidate` or replace it
+with a new value using `writeThrough`. Updates always run your class first; cache effects
+only run when that call succeeds.
+
+```ts
+const policy = defineCachePolicy<
+  UserRepository & { rename(id: string, name: string): Promise<void> }
+>()({
+  resources: {
+    userById: {
+      method: 'findById',
+      version: 1,
+      ttl: 300_000,
+      key: ([id]) => id,
+    },
+  },
+  methods: {
+    findById: { cache: 'userById' },
+    rename: {
+      effects: [{ invalidate: 'userById', keyArgs: ({ args }) => [args[0]] }],
+    },
+  },
+});
+```
+
+Effects target exact keys. They do not scan the cache, delete by prefix, or perform atomic
+multi-key operations. Include tenant identity in every tenant-specific key. Never include
+credentials, tokens, or other sensitive data because cache infrastructure can expose keys.
 
 ## Organizing cache registration
 
@@ -157,41 +226,11 @@ users/
 For cached use cases or other providers, place the policy with that feature's composition code
 rather than under `persistence`.
 
-## Mutations
-
-Mutations run the provider first, then apply exact effects in declaration order. Use
-`invalidate` to remove a known key or `writeThrough` to replace it with a canonical value.
-
-```ts
-const policy = defineCachePolicy<
-  UserRepository & { rename(id: string, name: string): Promise<void> }
->()({
-  resources: {
-    userById: {
-      method: 'findById',
-      version: 1,
-      ttl: 300_000,
-      key: ([id]) => id,
-    },
-  },
-  methods: {
-    findById: { cache: 'userById' },
-    rename: {
-      effects: [{ invalidate: 'userById', keyArgs: ({ args }) => [args[0]] }],
-    },
-  },
-});
-```
-
-Effects do not scan, delete by prefix, or perform atomic multi-key operations. Include
-tenant identity in every tenant-scoped key input. Never include credentials, tokens, or
-other sensitive data in keys because cache infrastructure can expose them.
-
 ## Testing
 
-`nestjs-cache-proxy/testing` supplies a deterministic in-memory cache for application
-tests. Override the application-owned `CACHE_MANAGER` with it; it is not a Redis or full
-cache-manager emulator.
+`nestjs-cache-proxy/testing` provides a deterministic in-memory cache for application tests.
+Override the application-owned `CACHE_MANAGER` with it, seed the values a test needs, and move
+its clock forward without waiting in real time. It is not a Redis or full cache-manager emulator.
 
 ```ts
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -245,7 +284,7 @@ Keyv adapter. Connection and retry configuration remain application-owned.
 
 ## Development
 
-The publishable package lives in [`code/`](code/). Install dependencies and run fast checks:
+The publishable package lives in `code/`. Install dependencies and run the project checks:
 
 ```sh
 make install
@@ -256,7 +295,7 @@ Run `make release-check` before preparing a release. It includes coverage and me
 backend contracts; Redis validation requires a running Docker daemon. The command validates
 the package but never publishes, tags, or creates a GitHub release.
 
-- [Architecture](docs/architecture.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
-- [Security policy](SECURITY.md)
+- [Architecture](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/docs/architecture.md)
+- [Contributing](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/CONTRIBUTING.md)
+- [Changelog](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/CHANGELOG.md)
+- [Security policy](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/SECURITY.md)
