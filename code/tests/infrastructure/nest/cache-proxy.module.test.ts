@@ -5,13 +5,15 @@ import { Inject, Injectable, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CacheErrorHook } from '../../../src/index.js';
+import type { CacheEventHook } from '../../../src/index.js';
 import {
+  CacheEventType,
   CacheProxyModule,
   cachedProvider,
   defineCachePolicy,
   InvalidCachedProviderError,
 } from '../../../src/index.js';
+import { CacheOperationError } from '../../../src/application/runtime/cache-event.js';
 import {
   createTestCache,
   TestCacheOperationType,
@@ -204,8 +206,8 @@ describe('CacheProxyModule', () => {
     ).toThrow('non-empty string');
   });
 
-  it('reports sanitized cache failures through the root hook', async () => {
-    const onCacheError = vi.fn<CacheErrorHook>();
+  it('reports sanitized cache events through the root hook', async () => {
+    const onCacheEvent = vi.fn<CacheEventHook>();
     const cache = {
       get: vi.fn(() => Promise.reject(new Error('failed for raw-key:user-1'))),
       set: vi.fn(() => Promise.resolve()),
@@ -216,7 +218,7 @@ describe('CacheProxyModule', () => {
         CacheModule.register({ isGlobal: true }),
         CacheProxyModule.forRoot({
           namespace: { application: 'users-api', environment: 'test' },
-          onCacheError,
+          onCacheEvent,
         }),
         CacheProxyModule.forFeature([
           { provide: ClassReader, useClass: ClassReader, policy },
@@ -236,12 +238,11 @@ describe('CacheProxyModule', () => {
       'class:1',
     );
 
-    const event = onCacheError.mock.calls[0]![0];
-    expect(event.cause.message).toBe('A cache operation failed.');
-    expect(event.cause.name).toBe('CacheOperationError');
-    expect(event.cause.message).not.toContain('raw-key:user-1');
-    expect(event.operation).toBe('get');
-    expect(event.resource).toBe('userById');
+    expect(onCacheEvent.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.GET_ERROR,
+    });
     await module.close();
   });
 

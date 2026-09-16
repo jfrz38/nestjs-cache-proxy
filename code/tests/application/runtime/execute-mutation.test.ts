@@ -4,15 +4,18 @@ import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
 import type { CacheKey } from '../../../src/domain/key/cache-key.js';
 import { ValidatedCachePolicy } from '../../../src/domain/policy/validated-cache-policy.js';
 import type { TimeToLive } from '../../../src/domain/policy/time-to-live.js';
-import type { CacheErrorReporter } from '../../../src/application/runtime/cache-error-reporter.port.js';
+import type { CacheEventReporter } from '../../../src/application/runtime/cache-event-reporter.port.js';
 import type { CacheStore } from '../../../src/application/runtime/cache-store.port.js';
 import { CachePolicyCompiler } from '../../../src/application/runtime/compile-cache-policy.js';
 import { CacheProxyFactory } from '../../../src/application/runtime/create-cache-proxy.js';
 import { CacheEffectsExecutor } from '../../../src/application/runtime/execute-cache-effects.js';
 import { CacheAsideExecutor } from '../../../src/application/runtime/execute-cache-aside.js';
 import { MutationExecutor } from '../../../src/application/runtime/execute-mutation.js';
-import { CacheOperationError } from '../../../src/application/runtime/cache-error-event.js';
-import { NoopCacheErrorReporter } from '../../../src/application/runtime/noop-cache-error-reporter.js';
+import {
+  CacheEventType,
+  CacheOperationError,
+} from '../../../src/application/runtime/cache-event.js';
+import { NoopCacheEventReporter } from '../../../src/application/runtime/noop-cache-event-reporter.js';
 import { CacheOperations } from '../../../src/application/runtime/cache-operations.js';
 
 const namespace = CacheNamespace.from({
@@ -87,7 +90,7 @@ function createPolicy() {
 function createProxy(
   target: Provider,
   cache: CacheStore,
-  reporter: CacheErrorReporter = new NoopCacheErrorReporter(),
+  reporter: CacheEventReporter = new NoopCacheEventReporter(),
 ): Provider {
   return new CacheProxyFactory(
     new CacheAsideExecutor(new CacheOperations(cache, reporter), namespace),
@@ -169,12 +172,12 @@ describe('mutation cache effects', () => {
     const cache = createCache({ delete: deleteCache });
     const proxy = new CacheProxyFactory(
       new CacheAsideExecutor(
-        new CacheOperations(cache, new NoopCacheErrorReporter()),
+        new CacheOperations(cache, new NoopCacheEventReporter()),
         namespace,
       ),
       new MutationExecutor(
         new CacheEffectsExecutor(
-          new CacheOperations(cache, new NoopCacheErrorReporter()),
+          new CacheOperations(cache, new NoopCacheEventReporter()),
           namespace,
         ),
       ),
@@ -218,10 +221,10 @@ describe('mutation cache effects', () => {
   it('reports cache failures, continues later effects, and preserves the provider result', async () => {
     const failure = new Error('delete failed');
     const reporter = {
-      report: vi.fn<CacheErrorReporter['report']>(() =>
+      report: vi.fn<CacheEventReporter['report']>(() =>
         Promise.reject(new Error('hook failed')),
       ),
-    } satisfies CacheErrorReporter;
+    } satisfies CacheEventReporter;
     const deleteCache = vi
       .fn<CacheStore['delete']>()
       .mockRejectedValueOnce(failure)
@@ -248,11 +251,86 @@ describe('mutation cache effects', () => {
 
     expect(deleteCache).toHaveBeenCalledTimes(2);
     expect(setCache).toHaveBeenCalledOnce();
-    expect(reporter.report).toHaveBeenCalledTimes(2);
-    const event = reporter.report.mock.calls[0]![0];
-    expect(event.cause).toBeInstanceOf(CacheOperationError);
-    expect(event.operation).toBe('delete');
-    expect(event.resource).toBe('userById');
+    expect(reporter.report).toHaveBeenCalledTimes(3);
+    expect(reporter.report.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.DELETE_ERROR,
+    });
+  });
+
+  it('applies write-through admission to the target resource arguments and value', async () => {
+    const cacheIf = vi.fn(
+      ({
+        args,
+        result,
+      }: {
+        readonly args: readonly unknown[];
+        readonly result: User;
+      }) => args[0] === result.id && result.name !== 'missing',
+    );
+    const set = vi.fn<CacheStore['set']>();
+    const policy = new CachePolicyCompiler().compile(
+      ValidatedCachePolicy.create({
+        resources: {
+          userById: {
+            cacheIf,
+            key: ([id]: readonly unknown[]) => String(id),
+            method: 'findById',
+            ttl: 1,
+            version: 1,
+          },
+        },
+        methods: {
+          update: {
+            effects: [
+              {
+                writeThrough: {
+                  keyArgs: ({ result }: { readonly result: User }) => [
+                    result.id,
+                  ],
+                  resource: 'userById',
+                  value: ({ result }: { readonly result: User }) => ({
+                    ...result,
+                    name: 'missing',
+                  }),
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+    const proxy = new CacheProxyFactory(
+      new CacheAsideExecutor(
+        new CacheOperations(createCache({ set }), new NoopCacheEventReporter()),
+        namespace,
+      ),
+      new MutationExecutor(
+        new CacheEffectsExecutor(
+          new CacheOperations(
+            createCache({ set }),
+            new NoopCacheEventReporter(),
+          ),
+          namespace,
+        ),
+      ),
+    ).create<Provider>(
+      {
+        findById: vi.fn(),
+        list: vi.fn(),
+        update: () => Promise.resolve({ id: 'user-1', name: 'Ada' }),
+      },
+      policy,
+    );
+
+    await proxy.update('user-1', 'Ada');
+
+    expect(cacheIf).toHaveBeenCalledWith({
+      args: ['user-1'],
+      result: { id: 'user-1', name: 'missing' },
+    });
+    expect(set).not.toHaveBeenCalled();
   });
 
   it('permits a concurrent pre-mutation read to repopulate a stale entry', async () => {

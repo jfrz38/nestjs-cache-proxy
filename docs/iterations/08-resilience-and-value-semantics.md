@@ -12,7 +12,7 @@ cache outages must not make the provider unavailable or silently hide operationa
 ## Objective
 
 Finalize an unambiguous stored-value envelope and per-operation fail-open behavior with a
-minimal safe error-reporting contract.
+minimal safe cache-event contract.
 
 ## Architectural decisions
 
@@ -25,10 +25,10 @@ minimal safe error-reporting contract.
   isolate user representation changes but are not a substitute for envelope compatibility.
 - Get failure behaves as miss. Set/delete failure does not change a successful provider
   response. Provider failure always propagates.
-- A synchronous or asynchronous user error hook is isolated: its failure is swallowed and
+- A synchronous or asynchronous user event hook is isolated: its failure is swallowed and
   cannot change provider behavior.
-- Error events contain operation, resource identifier, and error cause but no raw key,
-  args, result, or cached payload.
+- Cache events contain operation, outcome, resource identifier, and a sanitized cause only for
+  errors; they contain no raw key, args, result, or cached payload.
 - The public error cause is a fresh `CacheOperationError` with a fixed message. The original
   backend error is deliberately not exposed because it can include raw cache keys or values.
 - The MVP adds no cache-operation timeout; a slow cache can still delay a call.
@@ -38,30 +38,30 @@ minimal safe error-reporting contract.
 - Correctly round-trip supported values through memory and distributed stores.
 - Distinguish miss from cached `null` without store-specific assumptions.
 - Continue provider execution during cache failures.
-- Let applications observe cache errors safely through root configuration.
+- Let applications observe cache outcomes safely through root configuration.
 
 ## Technical scope
 
 - Envelope encoder/decoder and validation.
 - Central get/set/delete wrappers implementing fail-open rules.
-- Minimal `onCacheError` public option and redacted event type.
+- Minimal `onCacheEvent` public option and redacted event type.
 - Integration into read and mutation execution paths.
 
 ## Expected files and components
 
 - `src/application/runtime/cache-envelope.ts`
 - `src/application/runtime/cache-operations.ts`
-- `src/application/runtime/cache-error-event.ts`
-- `src/infrastructure/nest/cache-error-hook-reporter.ts`
+- `src/application/runtime/cache-event.ts`
+- `src/infrastructure/nest/cache-event-hook-reporter.ts`
 - updates to root options and runtime proxy
-- malformed-store and error-hook fixtures
+- malformed-store and event-hook fixtures
 
 ## Detailed steps
 
 1. Specify the envelope format and compatibility rule.
 2. Encode eligible values and decode only validated envelopes.
 3. Centralize get, set, and delete error handling.
-4. Define and invoke a non-blocking-by-contract error hook while safely awaiting a returned
+4. Define and invoke a non-blocking-by-contract event hook while safely awaiting a returned
    promise if necessary to avoid unhandled rejection.
 5. Redact key material and values from events and validation errors.
 6. Apply the wrappers to cache-aside and mutation effects.
@@ -77,7 +77,7 @@ minimal safe error-reporting contract.
    fail-open handling, envelope conversion, and reporter isolation.
 4. Preserve source-first ordered mutation effects while routing write-through through the
    same set operation; an `undefined` write-through projection is skipped.
-5. Thread an optional `onCacheError` callback from `forRoot` into the Nest composition root.
+5. Thread an optional `onCacheEvent` callback from `forRoot` into the Nest composition root.
 6. Await callback promises only to contain their rejection; callback latency is not bounded
    in this MVP and callback failures are swallowed.
 
@@ -95,7 +95,7 @@ minimal safe error-reporting contract.
 - `undefined` causes no set and is recomputed on the next call.
 - Every cache-operation failure follows documented fail-open behavior.
 - Every provider failure propagates unchanged.
-- Error-hook failure never affects the provider call and creates no unhandled rejection.
+- Event-hook failure never affects the provider call and creates no unhandled rejection.
 - Malformed cache data cannot be returned as a provider result.
 
 ## Definition of Done

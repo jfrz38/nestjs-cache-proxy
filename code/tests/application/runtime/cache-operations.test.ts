@@ -6,12 +6,15 @@ import { CacheNamespace } from '../../../src/domain/key/cache-namespace.js';
 import { CacheResourceName } from '../../../src/domain/key/cache-resource-name.js';
 import { TimeToLive } from '../../../src/domain/policy/time-to-live.js';
 import { CacheOperations } from '../../../src/application/runtime/cache-operations.js';
-import { CacheOperationError } from '../../../src/application/runtime/cache-error-event.js';
+import {
+  CacheEventType,
+  CacheOperationError,
+} from '../../../src/application/runtime/cache-event.js';
 import {
   CacheEnvelope,
   CacheEnvelopeState,
 } from '../../../src/application/runtime/cache-envelope.js';
-import type { CacheErrorReporter } from '../../../src/application/runtime/cache-error-reporter.port.js';
+import type { CacheEventReporter } from '../../../src/application/runtime/cache-event-reporter.port.js';
 import type { CacheStore } from '../../../src/application/runtime/cache-store.port.js';
 
 const key = CacheKey.create({
@@ -62,10 +65,10 @@ describe('CacheEnvelope', () => {
 });
 
 describe('CacheOperations', () => {
-  it('treats a malformed cached value as a reported miss without exposing its payload', async () => {
+  it('returns a miss and reports a sanitized error for malformed cached values', async () => {
     const reporter = {
-      report: vi.fn<CacheErrorReporter['report']>(),
-    } satisfies CacheErrorReporter;
+      report: vi.fn<CacheEventReporter['report']>(),
+    } satisfies CacheEventReporter;
     const operations = new CacheOperations(
       createCache({
         get: () =>
@@ -80,18 +83,19 @@ describe('CacheOperations', () => {
 
     await expect(operations.get('userById', key)).resolves.toBeUndefined();
 
-    const event = reporter.report.mock.calls[0]![0];
-    expect(event.cause).toBeInstanceOf(CacheOperationError);
-    expect(event.operation).toBe('get');
-    expect(event.resource).toBe('userById');
+    expect(reporter.report.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.GET_ERROR,
+    });
   });
 
   it('sanitizes backend failures and isolates reporter failures', async () => {
     const reporter = {
-      report: vi.fn<CacheErrorReporter['report']>(() =>
+      report: vi.fn<CacheEventReporter['report']>(() =>
         Promise.reject(new Error('hook failure')),
       ),
-    } satisfies CacheErrorReporter;
+    } satisfies CacheEventReporter;
     const operations = new CacheOperations(
       createCache({
         get: () => Promise.reject(new Error(`backend failed for ${key.value}`)),
@@ -101,16 +105,17 @@ describe('CacheOperations', () => {
 
     await expect(operations.get('userById', key)).resolves.toBeUndefined();
 
-    const event = reporter.report.mock.calls[0]![0];
-    expect(event.cause.message).toBe('A cache operation failed.');
-    expect(event.cause.message).not.toContain(key.value);
-    expect(event.cause.name).toBe('CacheOperationError');
+    expect(reporter.report.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.GET_ERROR,
+    });
   });
 
   it('skips undefined writes and reports failed set and delete operations', async () => {
     const reporter = {
-      report: vi.fn<CacheErrorReporter['report']>(),
-    } satisfies CacheErrorReporter;
+      report: vi.fn<CacheEventReporter['report']>(),
+    } satisfies CacheEventReporter;
     const set = vi
       .fn<CacheStore['set']>()
       .mockRejectedValue(new Error('set failed'));
@@ -133,13 +138,72 @@ describe('CacheOperations', () => {
       ttl,
     );
     expect(deleteOperation).toHaveBeenCalledOnce();
-    expect(reporter.report).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ operation: 'set', resource: 'userById' }),
+    expect(reporter.report).toHaveBeenNthCalledWith(1, {
+      resource: 'userById',
+      type: CacheEventType.SET_SKIPPED,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(2, {
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.SET_ERROR,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(3, {
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.DELETE_ERROR,
+    });
+  });
+
+  it('emits successful hit, miss, set, and delete outcomes', async () => {
+    const reporter = {
+      report: vi.fn<CacheEventReporter['report']>(),
+    } satisfies CacheEventReporter;
+    const operations = new CacheOperations(
+      createCache({
+        get: () => Promise.resolve(CacheEnvelope.encode('cached')),
+      }),
+      reporter,
     );
-    expect(reporter.report).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ operation: 'delete', resource: 'userById' }),
-    );
+
+    await operations.get('userById', key);
+    await new CacheOperations(createCache(), reporter).get('userById', key);
+    await operations.set('userById', key, 'value', ttl);
+    await operations.delete('userById', key);
+
+    expect(reporter.report).toHaveBeenNthCalledWith(1, {
+      resource: 'userById',
+      type: CacheEventType.GET_HIT,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(2, {
+      resource: 'userById',
+      type: CacheEventType.GET_MISS,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(3, {
+      resource: 'userById',
+      type: CacheEventType.SET_SUCCESS,
+    });
+    expect(reporter.report).toHaveBeenNthCalledWith(4, {
+      resource: 'userById',
+      type: CacheEventType.DELETE_SUCCESS,
+    });
+  });
+
+  it('treats cache admission failures as sanitized set errors without storing', async () => {
+    const reporter = {
+      report: vi.fn<CacheEventReporter['report']>(),
+    } satisfies CacheEventReporter;
+    const set = vi.fn<CacheStore['set']>();
+    const operations = new CacheOperations(createCache({ set }), reporter);
+
+    await operations.set('userById', key, { id: 'user-1' }, ttl, () => {
+      throw new Error(`predicate failed for ${key.value}`);
+    });
+
+    expect(set).not.toHaveBeenCalled();
+    expect(reporter.report.mock.calls[0]![0]).toEqual({
+      cause: new CacheOperationError(),
+      resource: 'userById',
+      type: CacheEventType.SET_ERROR,
+    });
   });
 });

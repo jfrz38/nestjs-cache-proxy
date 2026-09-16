@@ -361,6 +361,35 @@ make install
 make check
 ```
 
+Build a local package tarball and install that exact artifact in another project:
+
+```sh
+make pack-local
+pnpm add --force "$(pwd)/code/.artifacts/"*.tgz
+```
+
+From the consumer project, remove and reinstall the package to force pnpm to read the
+fresh tarball when its version has not changed:
+
+```sh
+pnpm remove nestjs-cache-proxy
+pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
+```
+
+The target builds the package first, removes older local tarballs, and writes the new
+artifact to `code/.artifacts/`. Removing the dependency before `pnpm add --force` ensures
+the changed declarations are picked up even when its package version has not changed.
+If the consumer still resolves an older declaration, remove the package's virtual-store
+directory before adding it again:
+
+```sh
+rm -rf node_modules/.pnpm/nestjs-cache-proxy@*
+pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
+```
+
+This validates the packaged output without creating a symlink or publishing a release.
+For editable development, use `pnpm link` instead.
+
 Run `make release-check` before preparing a release. It includes coverage and memory/Redis
 backend contracts; Redis validation requires a running Docker daemon. The command validates
 the package but never publishes, tags, or creates a GitHub release.

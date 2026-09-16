@@ -13,6 +13,12 @@ export class CompiledReadRule {
     private readonly keyBuilder: (
       args: readonly unknown[],
     ) => StructuredKeyInput,
+    private readonly cacheIf:
+      | ((context: {
+          readonly args: readonly unknown[];
+          readonly result: unknown;
+        }) => boolean)
+      | undefined,
   ) {}
 
   public buildCacheKey(
@@ -25,5 +31,9 @@ export class CompiledReadRule {
       resource: this.resource,
       version: this.version,
     });
+  }
+
+  public shouldCache(args: readonly unknown[], result: unknown): boolean {
+    return this.cacheIf?.({ args, result }) ?? true;
   }
 }

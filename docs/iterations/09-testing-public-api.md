@@ -17,7 +17,7 @@ policy contract assertions.
 - Testing utilities are public, versioned API under a separate package export.
 - A deterministic in-memory test cache implements only supported cache operations and TTL.
 - Tests use an injected clock rather than real sleeping.
-- Inspection returns safe structured records in test code; production error hooks remain
+- Inspection returns safe structured records in test code; production cache-event hooks remain
   redacted. Documentation warns against using sensitive values even in test keys.
 - Assertions focus on observable contracts: final keys, TTL, hit/miss, writes, deletes,
   and provider calls.
