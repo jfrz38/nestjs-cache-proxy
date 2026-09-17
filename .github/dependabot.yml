@@ -10,6 +10,10 @@ updates:
     versioning-strategy: increase
     commit-message:
       prefix: '[Dependency Update]'
+    ignore:
+      - dependency-name: typescript
+        versions:
+          - '>=7.0.0'
     groups:
       npm-development:
         dependency-type: development

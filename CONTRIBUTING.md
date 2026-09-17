@@ -2,7 +2,7 @@
 
 ## Setup
 
-Use Node.js 20.19.0 or later, pnpm 12.3.4, GNU Make, and Docker for Redis checks.
+Use Node.js 22.13.0 or later, pnpm 12.3.4, GNU Make, and Docker for Redis checks.
 
 ```sh
 make install

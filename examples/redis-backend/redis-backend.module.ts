@@ -1,7 +1,7 @@
 import { createKeyv } from '@keyv/redis';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { CacheProxyModule } from 'nestjs-cache-proxy';
+import { CacheProxyModule } from '@jfrz38/nestjs-cache-proxy';
 import { REDIS_BOOK_READER } from './book-reader.js';
 import { redisBookReaderCachePolicy } from './book-reader.cache-policy.js';
 import { InMemoryBookReader } from './in-memory-book-reader.js';
