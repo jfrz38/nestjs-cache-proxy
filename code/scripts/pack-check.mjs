@@ -158,7 +158,7 @@ async function createConsumer(type) {
           cacheable: '2.5.0',
           'cache-manager': cacheManagerVersion,
           keyv: '5.6.0',
-          'nestjs-cache-proxy': `file:${tarball}`,
+          '@jfrz38/nestjs-cache-proxy': `file:${tarball}`,
           rxjs: '7.8.2',
         },
         devDependencies: { '@types/node': '24.10.1' },
@@ -286,7 +286,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import { CacheProxyModule, defineCachePolicy } from 'nestjs-cache-proxy'; import { createTestCache, TestCacheOperationType } from 'nestjs-cache-proxy/testing'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
+      "import { CacheProxyModule, defineCachePolicy } from '@jfrz38/nestjs-cache-proxy'; import { createTestCache, TestCacheOperationType } from '@jfrz38/nestjs-cache-proxy/testing'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
     ],
     esmDirectory,
   );
@@ -294,7 +294,7 @@ try {
     node,
     [
       '--eval',
-      "const { CacheProxyModule, defineCachePolicy } = require('nestjs-cache-proxy'); const { createTestCache, TestCacheOperationType } = require('nestjs-cache-proxy/testing'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
+      "const { CacheProxyModule, defineCachePolicy } = require('@jfrz38/nestjs-cache-proxy'); const { createTestCache, TestCacheOperationType } = require('@jfrz38/nestjs-cache-proxy/testing'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
     ],
     cjsDirectory,
   );
@@ -303,7 +303,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import('nestjs-cache-proxy/dist/index.js').then(() => process.exit(1), (error) => { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') process.exit(1); });",
+      "import('@jfrz38/nestjs-cache-proxy/dist/index.js').then(() => process.exit(1), (error) => { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') process.exit(1); });",
     ],
     esmDirectory,
   );

@@ -3,13 +3,13 @@
 **Add caching to your NestJS services and repositories without changing how the rest of your application uses them.**
 
 [![CI](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
-[![npm downloads](https://img.shields.io/npm/dm/nestjs-cache-proxy)](https://www.npmjs.com/package/nestjs-cache-proxy)
-[![Node.js](https://img.shields.io/node/v/nestjs-cache-proxy)](https://nodejs.org/)
+[![npm](https://img.shields.io/npm/v/%40jfrz38%2Fnestjs-cache-proxy)](https://www.npmjs.com/package/@jfrz38/nestjs-cache-proxy)
+[![npm downloads](https://img.shields.io/npm/dm/%40jfrz38%2Fnestjs-cache-proxy)](https://www.npmjs.com/package/@jfrz38/nestjs-cache-proxy)
+[![Node.js](https://img.shields.io/node/v/%40jfrz38%2Fnestjs-cache-proxy)](https://nodejs.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-11%20%7C%2012-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
-[![License](https://img.shields.io/npm/l/nestjs-cache-proxy)](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/%40jfrz38%2Fnestjs-cache-proxy)](https://github.com/jfrz38/nestjs-cache-proxy/blob/main/LICENSE)
 
-`nestjs-cache-proxy` wraps your existing NestJS providers with a cache-aware proxy,
+`@jfrz38/nestjs-cache-proxy` wraps your existing NestJS providers with a cache-aware proxy,
 keeping cache keys, TTLs, and invalidation rules in a typed policy instead of scattering
 cache logic throughout your application.
 
@@ -43,11 +43,11 @@ store, Redis, or another compatible backend.
 
 ## Get started
 
-`nestjs-cache-proxy` requires Node.js 22.13.0 or later and supports NestJS 11 and 12.
+`@jfrz38/nestjs-cache-proxy` requires Node.js 22.13.0 or later and supports NestJS 11 and 12.
 Install it together with the NestJS cache packages:
 
 ```sh
-npm install nestjs-cache-proxy @nestjs/cache-manager cache-manager
+npm install @jfrz38/nestjs-cache-proxy @nestjs/cache-manager cache-manager
 ```
 
 ### 1. Configure your cache
@@ -58,7 +58,7 @@ uses this cache but never creates or configures a backend for you.
 ```ts
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { CacheProxyModule } from 'nestjs-cache-proxy';
+import { CacheProxyModule } from '@jfrz38/nestjs-cache-proxy';
 
 @Module({
   imports: [
@@ -77,7 +77,7 @@ Create a policy for the Promise-returning methods you want to cache. Here, every
 cached by ID for five minutes:
 
 ```ts
-import { defineCachePolicy } from 'nestjs-cache-proxy';
+import { defineCachePolicy } from '@jfrz38/nestjs-cache-proxy';
 
 interface UserRepository {
   findById(id: string): Promise<{ id: string; name: string } | null>;
@@ -105,7 +105,7 @@ inject `SqlUserRepository` and automatically receive the cached behavior.
 
 ```ts
 import { Module } from '@nestjs/common';
-import { CacheProxyModule } from 'nestjs-cache-proxy';
+import { CacheProxyModule } from '@jfrz38/nestjs-cache-proxy';
 import { userCachePolicy } from './user-cache-policy.js';
 
 class SqlUserRepository {
@@ -217,7 +217,7 @@ inside the dynamic module returned by `forFeature()`.
 
 ```ts
 import { Injectable, Module } from '@nestjs/common';
-import { cachedProvider } from 'nestjs-cache-proxy';
+import { cachedProvider } from '@jfrz38/nestjs-cache-proxy';
 import { DatabaseClient, DatabaseModule } from '../database/database.module.js';
 import { userCachePolicy } from './user-repository.cache-policy.js';
 
@@ -269,13 +269,13 @@ rather than under `persistence`.
 
 ## Testing
 
-`nestjs-cache-proxy/testing` provides a deterministic in-memory cache for application tests.
+`@jfrz38/nestjs-cache-proxy/testing` provides a deterministic in-memory cache for application tests.
 Override the application-owned `CACHE_MANAGER` with it, seed the values a test needs, and move
 its clock forward without waiting in real time. It is not a Redis or full cache-manager emulator.
 
 ```ts
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { createTestCache } from 'nestjs-cache-proxy/testing';
+import { createTestCache } from '@jfrz38/nestjs-cache-proxy/testing';
 
 const testCache = createTestCache();
 // Test.createTestingModule({ imports: [ApplicationModule] })
@@ -372,7 +372,7 @@ From the consumer project, remove and reinstall the package to force pnpm to rea
 fresh tarball when its version has not changed:
 
 ```sh
-pnpm remove nestjs-cache-proxy
+pnpm remove @jfrz38/nestjs-cache-proxy
 pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
 ```
 
@@ -383,7 +383,7 @@ If the consumer still resolves an older declaration, remove the package's virtua
 directory before adding it again:
 
 ```sh
-rm -rf node_modules/.pnpm/nestjs-cache-proxy@*
+rm -rf node_modules/.pnpm/@jfrz38+nestjs-cache-proxy@*
 pnpm add --force "/path/to/nestjs-cache-proxy/code/.artifacts/"*.tgz
 ```
 

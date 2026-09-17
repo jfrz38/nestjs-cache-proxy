@@ -1,4 +1,4 @@
-import { defineCachePolicy } from 'nestjs-cache-proxy';
+import { defineCachePolicy } from '@jfrz38/nestjs-cache-proxy';
 import type { BookReader } from './book-reader.js';
 
 export const redisBookReaderCachePolicy = defineCachePolicy<BookReader>()({

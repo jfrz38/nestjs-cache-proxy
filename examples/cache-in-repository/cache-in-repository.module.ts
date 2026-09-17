@@ -1,6 +1,6 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { CacheProxyModule } from 'nestjs-cache-proxy';
+import { CacheProxyModule } from '@jfrz38/nestjs-cache-proxy';
 import { bookRepositoryCachePolicy } from './book-repository.cache-policy.js';
 import { BOOK_REPOSITORY } from './book-repository.js';
 import { InMemoryBookRepository } from './in-memory-book-repository.js';

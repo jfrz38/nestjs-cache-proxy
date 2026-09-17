@@ -1,5 +1,5 @@
 {
-  "name": "nestjs-cache-proxy",
+  "name": "@jfrz38/nestjs-cache-proxy",
   "version": "0.1.0",
   "description": "Transparent, declarative caching for NestJS providers.",
   "license": "MIT",
@@ -38,6 +38,9 @@
     "LICENSE"
   ],
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "clean": "node ./scripts/clean.mjs",

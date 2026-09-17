@@ -1,4 +1,4 @@
-import { defineCachePolicy } from 'nestjs-cache-proxy';
+import { defineCachePolicy } from '@jfrz38/nestjs-cache-proxy';
 import type { BookRepository } from './book-repository.js';
 
 export const bookRepositoryCachePolicy = defineCachePolicy<BookRepository>()({
