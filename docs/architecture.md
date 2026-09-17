@@ -2,15 +2,15 @@
 
 ## Purpose
 
-`nestjs-cache-proxy` adds cache-aside behavior to selected methods of NestJS singleton
+`@jfrz38/nestjs-cache-proxy` adds cache-aside behavior to selected methods of NestJS singleton
 providers. Consumers keep their provider contracts and application-owned cache-manager setup;
 the library composes a proxy around the concrete provider.
 
 The package supports two public entry points:
 
-- `nestjs-cache-proxy` for policy definition, cache keys, provider registration, and NestJS
+- `@jfrz38/nestjs-cache-proxy` for policy definition, cache keys, provider registration, and NestJS
   module composition.
-- `nestjs-cache-proxy/testing` for deterministic test cache utilities.
+- `@jfrz38/nestjs-cache-proxy/testing` for deterministic test cache utilities.
 
 Internal compiler, runtime, envelope, token, and proxy implementation types are intentionally
 not package exports.
