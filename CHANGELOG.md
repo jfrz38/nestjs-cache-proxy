@@ -13,7 +13,7 @@ All notable changes to this project are documented here.
   and write-through effects.
 - NestJS dynamic-module composition for singleton `useClass` providers and a public testing
   entry point with a deterministic in-memory cache.
-- Node 20, 22, and 24 compatibility evidence for NestJS 11 and 12 with memory and the
+- Node 22, 24, and 26 compatibility evidence for NestJS 11 and 12 with memory and the
   documented Redis/Keyv configuration.
 
 Changing a resource key or cached value compatibility requires incrementing that resource's
