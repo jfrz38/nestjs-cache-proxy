@@ -51,7 +51,7 @@ jobs:
         uses: jfrz38/check-version-change@712f1f323f716ff1241b4fdd99e698d56daf462d # v1.4.0
         with:
           file-path: code/package.json
-          package-name: nestjs-cache-proxy
+          package-name: '@jfrz38/nestjs-cache-proxy'
           compare-source: registry
           registry: npm
           fail-on-unchanged: true
@@ -97,5 +97,5 @@ jobs:
       - name: Verify npm package contents
         run: pnpm --dir code publish --dry-run --access public --no-git-checks
 
-      - name: Publish nestjs-cache-proxy
+      - name: Publish @jfrz38/nestjs-cache-proxy
         run: pnpm --dir code publish --access public --provenance --no-git-checks

@@ -4,12 +4,12 @@ import {
   CacheProxyModule,
   cachedProvider,
   defineCachePolicy,
-} from 'nestjs-cache-proxy';
+} from '@jfrz38/nestjs-cache-proxy';
 import {
   buildPolicyCacheKey,
   createTestCache,
   TestCacheOperationType,
-} from 'nestjs-cache-proxy/testing';
+} from '@jfrz38/nestjs-cache-proxy/testing';
 
 interface UserRepository {
   findById(id: string): Promise<{ id: string } | null>;

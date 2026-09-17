@@ -1,6 +1,6 @@
 # Examples
 
-These recipes show common ways to compose `nestjs-cache-proxy` in a NestJS
+These recipes show common ways to compose `@jfrz38/nestjs-cache-proxy` in a NestJS
 application. They are small, compilable references rather than standalone
 applications, and they are not shipped in the npm package.
 
