@@ -43,7 +43,7 @@ store, Redis, or another compatible backend.
 
 ## Get started
 
-`@jfrz38/nestjs-cache-proxy` requires Node.js 20.19.0 or later and supports NestJS 11 and 12.
+`@jfrz38/nestjs-cache-proxy` requires Node.js 22.13.0 or later and supports NestJS 11 and 12.
 Install it together with the NestJS cache packages:
 
 ```sh
