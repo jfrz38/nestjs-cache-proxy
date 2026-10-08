@@ -70,15 +70,15 @@
     "@jfrz38/eslint-plugin-clean-architecture-highlighter": "0.1.1",
     "@keyv/redis": "5.1.6",
     "@nestjs/cache-manager": "12.0.0",
-    "@nestjs/common": "12.1.0",
-    "@nestjs/core": "12.1.0",
-    "@nestjs/testing": "12.1.0",
-    "@types/node": "26.6.2",
-    "@vitest/coverage-v8": "5.0.1",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/testing": "12.1.2",
+    "@types/node": "26.6.3",
+    "@vitest/coverage-v8": "5.0.3",
     "cache-manager": "7.2.9",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
-    "globals": "17.12.0",
+    "globals": "17.13.0",
     "keyv": "5.6.0",
     "markdownlint-cli2": "0.23.3",
     "prettier": "3.9.9",
@@ -86,7 +86,7 @@
     "rxjs": "7.8.2",
     "tsup": "8.5.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.1",
-    "vitest": "5.0.1"
+    "typescript-eslint": "8.71.0",
+    "vitest": "5.0.3"
   }
 }
