@@ -6,10 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!-- git-cliff: end of header -->
+
 ## [Unreleased]
 
-
 ### Added
+
 - **policy:** Add typed cache policy API
 - **key:** Add deterministic cache key contract
 - **runtime:** Add cache-aside proxy
@@ -23,14 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add cache admission events
 - Add CODEOWNERS file for repository ownership
 
-
 ### Fixed
+
 - Resolve Nest constants in ESM consumers
 - Decouple testing API from cache-manager types
 - Preserve cache policy resource inference
 
-
 ### Changed
+
 - Initial commit
 - Create architecture definition
 - Update architecture.md
@@ -40,7 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge remote-tracking branch 'origin/develop' into dependabot/github_actions/actions/checkout-7.0.1
 
 # Conflicts:
-#	.github/workflows/ci.yml
+
+# .github/workflows/ci.yml
+
 - Simplify architecture lint configuration
 - Organize source by architecture layer
 - Use default architecture lint layers
