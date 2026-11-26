@@ -1,6 +1,6 @@
 {
   "name": "@jfrz38/nestjs-cache-proxy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Transparent, declarative caching for NestJS providers.",
   "license": "MIT",
   "repository": {
