@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- git-cliff: end of header -->
 
+## [0.1.1] - 2026-11-26
+
+### Fixed
+
+- **types:** Resolve declarations for CommonJS consumers
+- Repair the version bump release flow (#40)
+
 ## [Unreleased]
 
 ### Fixed
