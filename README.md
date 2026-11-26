@@ -26,6 +26,7 @@ store, Redis, or another compatible backend.
 - [Get started](#get-started)
 - [Examples](#examples)
 - [Keep cached data fresh](#keep-cached-data-fresh)
+- [Configure a policy through dependency injection](#configure-a-policy-through-dependency-injection)
 - [Organizing cache registration](#organizing-cache-registration)
 - [Testing](#testing)
 - [Backends and compatibility](#backends-and-compatibility)
@@ -199,6 +200,55 @@ Increment a resource's `version` when its key meaning or stored value becomes in
 Changing the version isolates new entries; it does not migrate or remove entries written by
 an older version.
 
+## Configure a policy through dependency injection
+
+Use `cachedProviderAsync()` when policy values come from a NestJS provider such as
+`ConfigService`. Nest resolves the declared dependencies and waits for the policy factory
+before creating the cache proxy.
+
+```ts
+import { ConfigService } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import {
+  cachedProviderAsync,
+  defineCachePolicy,
+} from '@jfrz38/nestjs-cache-proxy';
+
+const USER_REPOSITORY = Symbol('USER_REPOSITORY');
+
+function createUserCachePolicy(ttl: number) {
+  return defineCachePolicy<SqlUserRepository>()({
+    resources: {
+      userById: {
+        method: 'findById',
+        version: 1,
+        ttl,
+        key: ([id]) => id,
+      },
+    },
+    methods: { findById: { cache: 'userById' } },
+  });
+}
+
+@Module({
+  providers: [
+    ...cachedProviderAsync({
+      provide: USER_REPOSITORY,
+      useClass: SqlUserRepository,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        createUserCachePolicy(config.getOrThrow<number>('USER_CACHE_TTL')),
+    }),
+  ],
+  exports: [USER_REPOSITORY],
+})
+export class UsersModule {}
+```
+
+The factory may return the policy directly or as a `Promise`. A generated policy is validated
+during application bootstrap with the same rules as a static policy. Invalid output prevents
+the module from compiling and reports `InvalidCachePolicyError`.
+
 ## Organizing cache registration
 
 Keep cached-provider registration in the feature module by default. A dedicated cache module
@@ -210,10 +260,14 @@ that couples unrelated features.
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `CacheProxyModule.forFeature()` | The dynamic module can construct the cached class from dependencies visible to it.                    |
 | `cachedProvider()`              | The cached class depends on providers owned or imported by the feature module doing the registration. |
+| `cachedProviderAsync()`         | The policy itself depends on providers visible to the feature module, such as `ConfigService`.        |
 
 Use `cachedProvider()` directly when the concrete implementation has constructor dependencies
 from imported modules. NestJS does not make modules imported by a parent feature module visible
 inside the dynamic module returned by `forFeature()`.
+
+The same module-visibility rule applies to dependencies listed by `cachedProviderAsync()`.
+Register it directly in the module whose imports or global providers expose those dependencies.
 
 ```ts
 import { Injectable, Module } from '@nestjs/common';

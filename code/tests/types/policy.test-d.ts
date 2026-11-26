@@ -1,6 +1,7 @@
 import {
   buildCacheKey,
   cachedProvider,
+  cachedProviderAsync,
   CacheEventType,
   CacheProxyModule,
   defineCachePolicy,
@@ -8,6 +9,7 @@ import {
   type CacheEvent,
   type CacheEventHook,
   type CachedProvider,
+  type CachedProviderAsync,
   type StructuredKeyInput,
 } from '../../src/index.js';
 import {
@@ -190,6 +192,46 @@ const provider: CachedProvider<UserRepository> = {
 
 cachedProvider(provider);
 
+const cacheConfiguration = { async: true };
+
+const asyncProvider: CachedProviderAsync<
+  UserRepository,
+  typeof policy.resources,
+  [typeof cacheConfiguration]
+> = {
+  provide: UserRepository,
+  useClass: DefaultUserRepository,
+  inject: ['cache-configuration'],
+  useFactory: (configuration) =>
+    configuration.async ? Promise.resolve(policy) : policy,
+};
+
+cachedProviderAsync(asyncProvider);
+
+const asyncProviderWithDefaultDependencies: CachedProviderAsync<UserRepository> =
+  {
+    provide: UserRepository,
+    useClass: DefaultUserRepository,
+    inject: ['cache-configuration'],
+    useFactory: (configuration: typeof cacheConfiguration) =>
+      configuration.async ? Promise.resolve(policy) : policy,
+  };
+
+cachedProviderAsync({
+  provide: UserRepository,
+  useClass: DefaultUserRepository,
+  inject: ['cache-configuration'],
+  useFactory: (configuration: typeof cacheConfiguration) =>
+    configuration.async ? Promise.resolve(policy) : policy,
+});
+
+cachedProviderAsync<UserRepository>({
+  provide: UserRepository,
+  useClass: DefaultUserRepository,
+  // @ts-expect-error useFactory must return a cache policy.
+  useFactory: () => ({ invalid: true }),
+});
+
 cachedProvider<UserRepository>({
   provide: UserRepository,
   // @ts-expect-error useClass cannot be an abstract class.
@@ -209,6 +251,9 @@ cachedProvider<UserRepository>({
 });
 
 void provider;
+void asyncProvider;
+void asyncProviderWithDefaultDependencies;
+void cacheConfiguration;
 void structuredInput;
 void cacheKey;
 void cacheEventHook;
