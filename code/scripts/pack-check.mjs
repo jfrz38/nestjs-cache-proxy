@@ -14,6 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const packageDirectory = resolve(scriptDirectory, '..');
+const sourcePackageVersion = readPackageVersion(
+  JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8')),
+);
 const artifactsDirectory = join(packageDirectory, '.artifacts');
 const consumerFixture = join(
   packageDirectory,
@@ -115,9 +118,17 @@ function getPackedManifest(cwd) {
   return parsed;
 }
 
-/** @param {unknown} value */
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isRecord(value) {
   return typeof value === 'object' && value !== null;
+}
+
+/** @param {unknown} packageJson @returns {string} */
+function readPackageVersion(packageJson) {
+  if (!isRecord(packageJson) || typeof packageJson.version !== 'string') {
+    throw new Error('Source package.json does not declare a valid version.');
+  }
+  return packageJson.version;
 }
 
 /** @param {unknown} manifest */
@@ -199,8 +210,10 @@ async function verifyExtractedPackage(extractedDirectory) {
   const packageJson = JSON.parse(
     await readFile(join(packageRoot, 'package.json'), 'utf8'),
   );
-  if (!isRecord(packageJson) || packageJson.version !== '0.1.0') {
-    throw new Error('Packaged package.json does not declare version 0.1.0.');
+  if (!isRecord(packageJson) || packageJson.version !== sourcePackageVersion) {
+    throw new Error(
+      `Packaged package.json does not declare version ${sourcePackageVersion}.`,
+    );
   }
   const { exports: packageExports } = packageJson;
   if (

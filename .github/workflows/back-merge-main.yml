@@ -1,0 +1,57 @@
+name: Back-merge main into develop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: back-merge-main-into-develop
+  cancel-in-progress: false
+
+jobs:
+  create-back-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create or reuse back-merge pull request
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          number="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --base develop \
+              --head main \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -z "$number" ]]; then
+            url="$(
+              gh pr create \
+                --repo "$GITHUB_REPOSITORY" \
+                --base develop \
+                --head main \
+                --title "chore: back-merge main into develop" \
+                --body "Back-merges the release history from \`main\` into \`develop\` so release tags remain part of the development history. This pull request must be merged with a merge commit, not squash or rebase."
+            )"
+            number="${url##*/}"
+          fi
+
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Require merge commit through auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.number }}
+        run: gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --auto --merge

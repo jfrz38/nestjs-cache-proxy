@@ -12,42 +12,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!-- git-cliff: end of header -->
+
 """
 body = """
-{% if version %}## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else %}## [Unreleased]
-{% endif %}
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
 {% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
 ### {{ entry.group | striptags | trim | upper_first }}
-{% for commit in entry.commits %}- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
-{% endfor %}
-{% endfor %}
+{% for commit in entry.commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
+{%- endfor %}
+{% endfor -%}
 """
 trim = true
 render_always = true
 
 [git]
 conventional_commits = true
-filter_unconventional = false
+filter_unconventional = true
 require_conventional = false
 split_commits = false
 protect_breaking_commits = true
 commit_parsers = [
-    { message = '^Merge (pull request|branch)', skip = true },
-    { message = '^\[Dependency Update\]', skip = true },
-    { message = '^\[CI Update\]', skip = true },
-    { message = '^chore(\([^)]*\))?: (bump version|add git-cliff)', skip = true },
-    { message = '^(docs?|test|style|chore|ci|build|config)(\([^)]*\))?!?:', skip = true },
+    { message = '^Merge', skip = true },
+    { message = '^(docs?|test|style|chore|ci|build|config|refactor)(\([^)]*\))?!?:', skip = true },
     { message = '^feat', group = 'Added' },
     { message = '^fix', group = 'Fixed' },
-    { message = '^(perf|refactor)', group = 'Changed' },
+    { message = '^perf', group = 'Changed' },
     { message = '^(remove|revert)', group = 'Removed' },
-    { message = '(?i)^add', group = 'Added' },
-    { message = '(?i)^fix', group = 'Fixed' },
-    { message = '(?i)^remove', group = 'Removed' },
-    { message = '.*', group = 'Changed' },
 ]
-filter_commits = false
+filter_commits = true
 fail_on_unmatched_commit = false
 link_parsers = []
 use_branch_tags = false
