@@ -1,6 +1,6 @@
 {
   "name": "@jfrz38/nestjs-cache-proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Transparent, declarative caching for NestJS providers.",
   "license": "MIT",
   "repository": {
@@ -57,7 +57,7 @@
     "format": "prettier --write ../*.md ../docs/**/*.md ../examples/**/*.{md,ts} ./**/*.{ts,mts,mjs,json}",
     "format:check": "prettier --check ../*.md ../docs/**/*.md ../examples/**/*.{md,ts} ./**/*.{ts,mts,mjs,json}",
     "lint": "eslint src tests scripts && pnpm run lint:markdown",
-    "lint:markdown": "markdownlint-cli2 ../*.md ../docs/**/*.md ../examples/**/*.md",
+    "lint:markdown": "markdownlint-cli2 --config ../.markdownlint-cli2.mjs ../*.md ../docs/**/*.md ../examples/**/*.md",
     "pack:check": "node ./scripts/pack-check.mjs",
     "release:check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:coverage && pnpm run build && pnpm run pack:check && pnpm run test:backend:all",
     "postpack": "node ./scripts/cleanup-package-files.mjs",
