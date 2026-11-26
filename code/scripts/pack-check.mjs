@@ -30,11 +30,13 @@ const requiredFiles = new Set([
   'package.json',
   'dist/index.cjs',
   'dist/index.cjs.map',
+  'dist/index.d.cts',
   'dist/index.d.ts',
   'dist/index.js',
   'dist/index.js.map',
   'dist/testing/index.cjs',
   'dist/testing/index.cjs.map',
+  'dist/testing/index.d.cts',
   'dist/testing/index.d.ts',
   'dist/testing/index.js',
   'dist/testing/index.js.map',
@@ -211,7 +213,9 @@ async function verifyExtractedPackage(extractedDirectory) {
   }
 
   const declarationFiles = [
+    join(packageRoot, 'dist', 'index.d.cts'),
     join(packageRoot, 'dist', 'index.d.ts'),
+    join(packageRoot, 'dist', 'testing', 'index.d.cts'),
     join(packageRoot, 'dist', 'testing', 'index.d.ts'),
   ];
   for (const declarationFile of declarationFiles) {
@@ -308,26 +312,31 @@ try {
     esmDirectory,
   );
 
-  await cp(consumerFixture, join(esmDirectory, 'index.ts'));
+  await Promise.all([
+    cp(consumerFixture, join(esmDirectory, 'index.ts')),
+    cp(consumerFixture, join(cjsDirectory, 'index.ts')),
+  ]);
   const tsc = resolve(packageDirectory, 'node_modules/typescript/bin/tsc');
-  run(
-    node,
-    [
-      tsc,
-      '--noEmit',
-      '--experimentalDecorators',
-      '--module',
-      'NodeNext',
-      '--moduleResolution',
-      'NodeNext',
-      '--target',
-      'ES2022',
-      '--types',
-      'node',
-      'index.ts',
-    ],
-    esmDirectory,
-  );
+  for (const consumerDirectory of [esmDirectory, cjsDirectory]) {
+    run(
+      node,
+      [
+        tsc,
+        '--noEmit',
+        '--experimentalDecorators',
+        '--module',
+        'NodeNext',
+        '--moduleResolution',
+        'NodeNext',
+        '--target',
+        'ES2022',
+        '--types',
+        'node',
+        'index.ts',
+      ],
+      consumerDirectory,
+    );
+  }
 } finally {
   await Promise.all([
     esmDirectory === ''
