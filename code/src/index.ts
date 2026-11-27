@@ -10,6 +10,7 @@ export {
 export { InvalidCachePolicyError } from './domain/policy/invalid-cache-policy-error.js';
 export { validateCachePolicy } from './domain/policy/validate-policy.js';
 export { cachedProvider } from './infrastructure/nest/cached-provider.js';
+export { cachedProviderAsync } from './infrastructure/nest/cached-provider-async.js';
 export { CacheProxyModule } from './infrastructure/nest/cache-proxy.module.js';
 export { InvalidCachedProviderError } from './infrastructure/nest/invalid-cached-provider-error.js';
 export type { StructuredKeyInput } from './domain/key/structured-key.types.js';
@@ -38,6 +39,7 @@ export type {
 } from './domain/policy/policy.types.js';
 export type {
   CachedProvider,
+  CachedProviderAsync,
   RuntimeToken,
   UseClass,
 } from './infrastructure/nest/cached-provider.types.js';

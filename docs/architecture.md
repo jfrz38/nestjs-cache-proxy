@@ -45,6 +45,13 @@ module visibility still applies: imports of a parent module are not inherited by
 created by `forFeature()`. The dedicated module exports only the public runtime token; the concrete
 implementation remains private. TypeScript interfaces are not runtime tokens.
 
+`cachedProviderAsync(registration)` uses the same public-token and private-implementation
+composition while resolving a policy through a NestJS factory provider. Nest resolves the
+implementation, cache manager, root options, and declared factory dependencies before the policy
+factory runs. The returned policy may be synchronous or asynchronous; the public proxy is created
+only after it resolves and passes the normal policy validation. A fresh private implementation
+symbol per registration prevents registrations from sharing concrete instances accidentally.
+
 Only singleton-scoped `useClass` providers are supported. NestJS constructs the concrete provider,
 resolves its constructor dependencies, and invokes lifecycle hooks once. The public proxy preserves
 method `this` binding and passes through unconfigured methods, properties, symbols, and accessors,
@@ -66,11 +73,13 @@ For repository caching, `infrastructure/persistence/cache` is a useful optional 
 policy and dedicated cache module; policies for other provider types stay with their respective
 composition code.
 
-Policies are validated once and compiled into immutable runtime rules. A key has the stable `k1`
-format and includes namespace, resource, version, and canonical structured input. The accepted input
-is limited to null, booleans, finite numbers, strings, dense arrays, and plain string-keyed objects.
-Cycles, accessors, sparse arrays, class instances, collections, functions, symbols, `BigInt`, and
-non-finite numbers are rejected.
+Static policies are validated when their provider descriptors are created. Policies supplied by an
+asynchronous registration are validated during NestJS bootstrap after their factory resolves. Both
+paths use the same validator and compile valid policies into immutable runtime rules. A key has the
+stable `k1` format and includes namespace, resource, version, and canonical structured input. The
+accepted input is limited to null, booleans, finite numbers, strings, dense arrays, and plain
+string-keyed objects. Cycles, accessors, sparse arrays, class instances, collections, functions,
+symbols, `BigInt`, and non-finite numbers are rejected.
 
 Keys distinguish values such as `1` and `'1'`, preserve `-0`, and sort object keys. Resource-version
 increments isolate incompatible values; they neither migrate nor delete entries from earlier versions.
