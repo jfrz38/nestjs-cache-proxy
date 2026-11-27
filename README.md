@@ -188,14 +188,19 @@ tokens, or other secrets in cache keys.
 
 ## Choose a registration style
 
-| Registration                    | Use it when                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------------ |
-| `CacheProxyModule.forFeature()` | The dynamic module can construct the provider from dependencies visible to it.             |
-| `cachedProvider()`              | The provider depends on modules imported by the feature module that owns the registration. |
+| Registration                    | Use it when                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `CacheProxyModule.forFeature()` | The dynamic module can construct the provider from dependencies visible to it.                    |
+| `cachedProvider()`              | The provider depends on modules imported by the feature module that owns the registration.        |
+| `cachedProviderAsync()`         | The policy depends on an injected provider such as `ConfigService`, or is created asynchronously. |
 
 NestJS does not make a parent module's imports visible inside the dynamic module
 returned by `forFeature()`. In that case, spread `cachedProvider()` into the
 parent module's `providers` array.
+
+Use `cachedProviderAsync()` when policy values such as TTL come from dependency
+injection. Its factory may return a policy or a `Promise` of one, and its
+injected dependencies must be visible to the module that registers the provider.
 
 See the [examples](./examples/README.md) for complete composition recipes:
 

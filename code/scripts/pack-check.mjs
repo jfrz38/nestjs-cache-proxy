@@ -303,7 +303,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "import { CacheProxyModule, defineCachePolicy } from '@jfrz38/nestjs-cache-proxy'; import { createTestCache, TestCacheOperationType } from '@jfrz38/nestjs-cache-proxy/testing'; if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forRoot !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
+      "import { CacheProxyModule, cachedProviderAsync, defineCachePolicy } from '@jfrz38/nestjs-cache-proxy'; import { createTestCache, TestCacheOperationType } from '@jfrz38/nestjs-cache-proxy/testing'; if (typeof defineCachePolicy !== 'function' || typeof cachedProviderAsync !== 'function' || typeof CacheProxyModule.forRoot !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
     ],
     esmDirectory,
   );
@@ -311,7 +311,7 @@ try {
     node,
     [
       '--eval',
-      "const { CacheProxyModule, defineCachePolicy } = require('@jfrz38/nestjs-cache-proxy'); const { createTestCache, TestCacheOperationType } = require('@jfrz38/nestjs-cache-proxy/testing'); if (typeof defineCachePolicy !== 'function' || typeof CacheProxyModule.forFeature !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
+      "const { CacheProxyModule, cachedProviderAsync, defineCachePolicy } = require('@jfrz38/nestjs-cache-proxy'); const { createTestCache, TestCacheOperationType } = require('@jfrz38/nestjs-cache-proxy/testing'); if (typeof defineCachePolicy !== 'function' || typeof cachedProviderAsync !== 'function' || typeof CacheProxyModule.forFeature !== 'function' || typeof createTestCache !== 'function' || TestCacheOperationType.GET !== 'get') process.exit(1);",
     ],
     cjsDirectory,
   );

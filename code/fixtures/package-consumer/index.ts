@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import {
   CacheProxyModule,
   cachedProvider,
+  cachedProviderAsync,
   defineCachePolicy,
 } from '@jfrz38/nestjs-cache-proxy';
 import {
@@ -60,6 +61,18 @@ void cachedProvider({
   provide: 'repository',
   useClass: SqlUserRepository,
   policy,
+});
+void cachedProviderAsync<UserRepository>({
+  provide: 'async-repository',
+  useClass: SqlUserRepository,
+  inject: ['cache-ttl'],
+  useFactory: (ttl: number) =>
+    Promise.resolve({
+      ...policy,
+      resources: {
+        userById: { ...policy.resources.userById, ttl },
+      },
+    }),
 });
 void testCache;
 void key;
