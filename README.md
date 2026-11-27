@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/jfrz38/nestjs-cache-proxy/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40jfrz38%2Fnestjs-cache-proxy)](https://www.npmjs.com/package/@jfrz38/nestjs-cache-proxy)
+[![npm downloads](https://img.shields.io/npm/dm/%40jfrz38%2Fnestjs-cache-proxy)](https://www.npmjs.com/package/@jfrz38/nestjs-cache-proxy)
 [![License](https://img.shields.io/npm/l/%40jfrz38%2Fnestjs-cache-proxy)](./LICENSE)
 
 </div>
